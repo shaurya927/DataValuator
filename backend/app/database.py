@@ -208,3 +208,9 @@ async def get_experiment(db_path: Path, experiment_id: str) -> Optional[dict]:
         async with db.execute("SELECT * FROM experiments WHERE id = ?", (experiment_id,)) as cursor:
             row = await cursor.fetchone()
             return dict(row) if row else None
+
+async def list_experiments(db_path: Path) -> List[dict]:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM experiments") as cursor:
+            return [dict(row) for row in await cursor.fetchall()]

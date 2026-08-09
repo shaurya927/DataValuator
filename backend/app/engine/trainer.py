@@ -55,7 +55,7 @@ class DataValuatorTrainer:
         self.config = config
         self.progress_callback = progress_callback
 
-        self.num_train_samples = len(train_loader.dataset)
+        self.num_train_samples = config.get("original_num_samples") or len(train_loader.dataset)
         self.max_epochs = config.get("epochs", 20)
         self.checkpoint_interval = config.get("checkpoint_interval", 5)
 

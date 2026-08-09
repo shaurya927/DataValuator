@@ -53,6 +53,30 @@ def run_test():
     assert res.status_code == 200, f"Valuation summary failed: {res.text}"
     print(f"Summary: {res.json()}")
 
+    print("6. Starting pruning experiment...")
+    exp_config = {
+        "run_id": run_id,
+        "type": "prune",
+        "exclude_categories": ["harmful", "redundant"]
+    }
+    res = requests.post(f"{BASE_URL}/experiments/prune", json=exp_config)
+    assert res.status_code == 200, f"Start experiment failed: {res.text}"
+    exp_id = res.json()["experiment_id"]
+    print(f"Experiment started, ID: {exp_id}")
+
+    print("7. Waiting for experiment to complete...")
+    while True:
+        res = requests.get(f"{BASE_URL}/experiments/{exp_id}/results")
+        if res.status_code == 200:
+            exp_data = res.json()
+            if exp_data["status"] == "completed":
+                print(f"Experiment completed! Original Acc: {exp_data['original_accuracy']}, Result Acc: {exp_data['result_accuracy']}, Removed: {exp_data['samples_removed']}")
+                break
+            elif exp_data["status"] == "failed":
+                print("Experiment failed!")
+                break
+        time.sleep(1)
+
     os.remove(csv_path)
     print("Smoke test finished successfully!")
 

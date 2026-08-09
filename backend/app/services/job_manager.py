@@ -344,8 +344,17 @@ class JobManager:
             if not run_info:
                 raise ValueError(f"Training run {config_dict['run_id']} not found")
 
+            dataset_info = await get_dataset(settings.DB_PATH, run_info["dataset_id"])
+            if not dataset_info:
+                raise ValueError(f"Dataset {run_info['dataset_id']} not found")
+                
+            from app.database import get_refined_valuations
+            exclude_cats = config_dict.get("exclude_categories", ["harmful", "redundant"])
+            refined_vals = await get_refined_valuations(settings.DB_PATH, config_dict["run_id"], exclude_cats)
+            kept_indices = [v["sample_index"] for v in refined_vals]
+
             result = await asyncio.to_thread(
-                self._run_experiment_blocking, config_dict, run_info
+                self._run_experiment_blocking, config_dict, run_info, dataset_info, kept_indices
             )
 
             await update_experiment(settings.DB_PATH, exp_id, {
@@ -366,14 +375,71 @@ class JobManager:
             })
 
     @staticmethod
-    def _run_experiment_blocking(config_dict, run_info):
-        """Blocking experiment execution — placeholder for full implementation."""
-        # This would retrain the model on pruned data and compare
-        # For now return placeholder structure
+    def _run_experiment_blocking(config_dict, run_info, dataset_info, kept_indices):
+        """Blocking experiment execution — pruning and retraining."""
+        import os
+        import tempfile
+        from torch.utils.data import Subset, DataLoader
+        from app.engine.trainer import DataValuatorTrainer
+        from app.engine.models import get_model
+        
+        # load original dataset
+        train_loader_orig, val_loader, ds_meta = JobManager._load_dataset(dataset_info, run_info.get("target_column"))
+        
+        # filter train_loader
+        pruned_dataset = Subset(train_loader_orig.dataset, kept_indices)
+        num_workers = getattr(train_loader_orig, 'num_workers', 0)
+        train_loader = DataLoader(
+            pruned_dataset, 
+            batch_size=train_loader_orig.batch_size, 
+            shuffle=True, 
+            num_workers=num_workers
+        )
+        
+        # model setup
+        model_name = run_info.get("template") or run_info.get("model_name", "simple_cnn")
+        epochs = config_dict.get("epochs", run_info.get("epochs", 20))
+        lr = config_dict.get("learning_rate", run_info.get("learning_rate", 0.01))
+        
+        kwargs = {}
+        if model_name == 'tabular' and ds_meta.get('sample_shape'):
+            kwargs['input_dim'] = ds_meta['sample_shape'][0]
+            
+        model = get_model(model_name, ds_meta["num_classes"], **kwargs)
+        
+        # Create a temporary file for HDF5 storage that won't crash on Windows
+        fd, temp_h5_path = tempfile.mkstemp(suffix=".h5")
+        os.close(fd)
+        
+        config = {
+            "epochs": epochs,
+            "lr": lr,
+            "original_num_samples": len(train_loader_orig.dataset),
+            "save_dir": None,
+            "storage_path": temp_h5_path, 
+            "checkpoint_interval": 9999
+        }
+        
+        try:
+            trainer = DataValuatorTrainer(
+                 model=model,
+                 train_loader=train_loader,
+                 val_loader=val_loader,
+                 config=config
+            )
+            results = trainer.train()
+        finally:
+            # Clean up the temporary HDF5 file
+            if os.path.exists(temp_h5_path):
+                try:
+                    os.remove(temp_h5_path)
+                except Exception:
+                    pass
+        
         return {
             "original_accuracy": run_info.get("val_accuracy", 0.0),
-            "result_accuracy": 0.0,
-            "samples_removed": 0,
+            "result_accuracy": results.get("final_val_accuracy", 0.0),
+            "samples_removed": len(train_loader_orig.dataset) - len(kept_indices),
             "precision": None,
             "recall": None,
         }

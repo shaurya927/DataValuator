@@ -24,8 +24,14 @@ async def start_label_corruption(config: ExperimentConfig, settings: Settings = 
 
 @router.get("/{experiment_id}/results", response_model=ExperimentResult)
 async def get_results(experiment_id: str, settings: Settings = Depends(get_settings)):
-    return ExperimentResult(id=experiment_id, run_id="dummy", type="prune", config="{}", status="completed")
+    from app.database import get_experiment
+    exp = await get_experiment(settings.DB_PATH, experiment_id)
+    if not exp:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    return ExperimentResult(**exp)
 
 @router.get("/history", response_model=List[ExperimentResult])
 async def get_experiments_history(settings: Settings = Depends(get_settings)):
-    return []
+    from app.database import list_experiments
+    exps = await list_experiments(settings.DB_PATH)
+    return [ExperimentResult(**e) for e in exps]
