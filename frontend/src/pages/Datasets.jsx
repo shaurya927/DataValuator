@@ -63,7 +63,7 @@ export default function Datasets() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-lg">{ds.name}</h3>
-                      <p className="text-xs text-muted">{new Date(ds.createdAt).toLocaleDateString()}</p>
+                      <p className="text-xs text-muted">{new Date(ds.created_at).toLocaleDateString()}</p>
                     </div>
                   </div>
                 </div>
@@ -71,11 +71,11 @@ export default function Datasets() {
                 <div className="flex justify-between py-3 border-y border-glass mb-4">
                   <div className="text-center">
                     <p className="text-xs text-muted uppercase">Samples</p>
-                    <p className="font-mono font-medium">{ds.sampleCount.toLocaleString()}</p>
+                    <p className="font-mono font-medium">{ds.num_samples?.toLocaleString() || '0'}</p>
                   </div>
                   <div className="text-center border-l border-glass pl-4">
                     <p className="text-xs text-muted uppercase">Classes</p>
-                    <p className="font-mono font-medium">{ds.classCount}</p>
+                    <p className="font-mono font-medium">{ds.num_classes || '0'}</p>
                   </div>
                 </div>
 
