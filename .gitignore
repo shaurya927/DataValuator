@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+
+# Runtime data
+data/
+*.h5
+*.pt
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.venv/
+venv/
+venv*/
+backend/venv*/
+frontend/node_modules/
+*.env
+*.env.*
+**/*.env
+.env.*
+backend/data/
+data/

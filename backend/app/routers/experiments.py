@@ -1,0 +1,31 @@
+from fastapi import APIRouter, Depends, HTTPException
+from typing import List
+
+from app.config import Settings, get_settings
+from app.models.valuation import ExperimentConfig, ExperimentResult
+from app.services.job_manager import job_manager
+
+router = APIRouter(prefix="/api/experiments", tags=["experiments"])
+
+@router.post("/prune", response_model=dict)
+async def start_prune_experiment(config: ExperimentConfig, settings: Settings = Depends(get_settings)):
+    exp_id = await job_manager.start_experiment_job({"type": "prune", **config.dict()})
+    return {"experiment_id": exp_id, "message": "Prune experiment started"}
+
+@router.post("/random-prune", response_model=dict)
+async def start_random_prune_experiment(config: ExperimentConfig, settings: Settings = Depends(get_settings)):
+    exp_id = await job_manager.start_experiment_job({"type": "random_prune", **config.dict()})
+    return {"experiment_id": exp_id, "message": "Random prune experiment started"}
+
+@router.post("/label-corruption", response_model=dict)
+async def start_label_corruption(config: ExperimentConfig, settings: Settings = Depends(get_settings)):
+    exp_id = await job_manager.start_experiment_job({"type": "label_corruption", **config.dict()})
+    return {"experiment_id": exp_id, "message": "Label corruption experiment started"}
+
+@router.get("/{experiment_id}/results", response_model=ExperimentResult)
+async def get_results(experiment_id: str, settings: Settings = Depends(get_settings)):
+    return ExperimentResult(id=experiment_id, run_id="dummy", type="prune", config="{}", status="completed")
+
+@router.get("/history", response_model=List[ExperimentResult])
+async def get_experiments_history(settings: Settings = Depends(get_settings)):
+    return []
