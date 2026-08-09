@@ -38,6 +38,9 @@ export const api = {
 
   getDataset: (id) => request(`/datasets/${id}`),
 
+  getSampleData: (datasetId, sampleIndex) => 
+    request(`/datasets/${datasetId}/data/${sampleIndex}`),
+
   deleteDataset: (id) =>
     request(`/datasets/${id}`, { method: 'DELETE' }),
 

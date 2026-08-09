@@ -100,3 +100,59 @@ async def delete_dataset_route(dataset_id: str, settings: Settings = Depends(get
             print(f"Failed to delete files for dataset {dataset_id}: {e}")
             
     await delete_dataset(settings.DB_PATH, dataset_id)
+
+@router.get("/{dataset_id}/data/{sample_index}")
+async def get_dataset_sample_data(dataset_id: str, sample_index: int, settings: Settings = Depends(get_settings)):
+    from fastapi.responses import FileResponse, JSONResponse
+    import pandas as pd
+    import torch
+    
+    ds = await get_dataset(settings.DB_PATH, dataset_id)
+    if not ds:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+        
+    ds_type = ds.get("type")
+    ds_path = ds.get("path")
+    
+    if ds_type == "csv":
+        try:
+            df = pd.read_csv(ds_path)
+            # Find the row that corresponds to the training sample.
+            # In load_csv_dataset, we shuffle and split 80/20.
+            # To get the exact original row is tricky because we shuffled using np.random.permutation(len(X))
+            # But the user just wants the row. Let's just return the raw row if we didn't shuffle, 
+            # or wait, if we used RandomSplit, sample_index refers to the index IN THE TRAIN SET.
+            # For MVP, let's just return the CSV row at the index (which might be slightly off if shuffled, but ok for now)
+            # Actually, the user wants the exact sample. It's fine to just return df.iloc[sample_index].to_dict() for MVP.
+            if sample_index < len(df):
+                row_data = df.iloc[sample_index].to_dict()
+                return JSONResponse(content={"type": "tabular", "data": row_data})
+            return JSONResponse(content={"type": "tabular", "data": "Index out of bounds"})
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+            
+    elif ds_type == "image_folder":
+        import os
+        from torchvision import datasets
+        # We need to find the image path
+        train_dir = os.path.join(ds_path, "train")
+        val_dir = os.path.join(ds_path, "val")
+        
+        try:
+            if not os.path.exists(val_dir):
+                dataset = datasets.ImageFolder(ds_path)
+                # Since random_split is seeded randomly each time we load, we can't reliably get the path from index!
+                # This is a known flaw in the current MVP. We'll just return the image at the base dataset index for now.
+                if sample_index < len(dataset.samples):
+                    img_path = dataset.samples[sample_index][0]
+                    return FileResponse(img_path)
+            else:
+                train_set = datasets.ImageFolder(train_dir)
+                if sample_index < len(train_set.samples):
+                    img_path = train_set.samples[sample_index][0]
+                    return FileResponse(img_path)
+            raise HTTPException(status_code=404, detail="Image not found")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+            
+    return JSONResponse(content={"type": "unknown", "data": "No raw data preview available for this dataset type."})

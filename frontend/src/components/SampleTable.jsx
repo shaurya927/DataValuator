@@ -33,22 +33,22 @@ export default function SampleTable({ samples, onRowClick }) {
       <table className="table">
         <thead>
           <tr>
-            <th onClick={() => requestSort('index')}>Index {sortConfig.key === 'index' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+            <th onClick={() => requestSort('sample_index')}>Index {sortConfig.key === 'sample_index' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
             <th onClick={() => requestSort('category')}>Category {sortConfig.key === 'category' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
             <th onClick={() => requestSort('unified_score')}>Unified Score {sortConfig.key === 'unified_score' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
-            <th onClick={() => requestSort('forgetting')}>Forgetting {sortConfig.key === 'forgetting' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
-            <th onClick={() => requestSort('aum')}>AUM {sortConfig.key === 'aum' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+            <th onClick={() => requestSort('forgetting_count')}>Forgetting {sortConfig.key === 'forgetting_count' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+            <th onClick={() => requestSort('aum_score')}>AUM {sortConfig.key === 'aum_score' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
             <th onClick={() => requestSort('avg_loss')}>Avg Loss {sortConfig.key === 'avg_loss' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
           </tr>
         </thead>
         <tbody>
           {sortedSamples.map((sample) => (
             <tr 
-              key={sample.index} 
+              key={sample.sample_index ?? sample.index} 
               onClick={() => onRowClick && onRowClick(sample)}
               className={onRowClick ? 'cursor-pointer' : ''}
             >
-              <td className="font-mono text-muted">#{sample.index}</td>
+              <td className="font-mono text-muted">#{sample.sample_index ?? sample.index}</td>
               <td>
                 <span className={`badge badge-${sample.category}`}>
                   {sample.category.replace('_', ' ')}
@@ -59,9 +59,9 @@ export default function SampleTable({ samples, onRowClick }) {
                   {sample.unified_score.toFixed(3)}
                 </div>
               </td>
-              <td className="font-mono">{sample.forgetting}</td>
-              <td className="font-mono">{sample.aum?.toFixed(3) || '-'}</td>
-              <td className="font-mono">{sample.avg_loss?.toFixed(3) || '-'}</td>
+              <td className="font-mono">{sample.forgetting_count ?? sample.forgetting}</td>
+              <td className="font-mono">{sample.aum_score?.toFixed(3) ?? sample.aum?.toFixed(3) ?? '-'}</td>
+              <td className="font-mono">{sample.avg_loss?.toFixed(3) ?? '-'}</td>
             </tr>
           ))}
           {sortedSamples.length === 0 && (

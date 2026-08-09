@@ -14,9 +14,9 @@ export default function ScatterPlot({ data, onPointClick }) {
   const traces = Object.keys(colorMap).map(category => {
     const catData = data.filter(d => d.category === category);
     return {
-      x: catData.map(d => d.x),
-      y: catData.map(d => d.y),
-      text: catData.map(d => `Index: ${d.index}<br>Category: ${category}`),
+      x: catData.map(d => d.embedding_x || d.x),
+      y: catData.map(d => d.embedding_y || d.y),
+      text: catData.map(d => `Index: ${d.sample_index ?? d.index}<br>Category: ${category}`),
       mode: 'markers',
       type: 'scatter',
       name: category.replace('_', ' '),
@@ -26,7 +26,7 @@ export default function ScatterPlot({ data, onPointClick }) {
         opacity: 0.7,
         line: { width: 0 }
       },
-      customdata: catData.map(d => d.index)
+      customdata: catData.map(d => d.sample_index ?? d.index)
     };
   });
 
