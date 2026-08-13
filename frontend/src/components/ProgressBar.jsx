@@ -21,13 +21,13 @@ export default function ProgressBar({ progress, epoch, totalEpochs, loss, accura
           </div>
         </div>
         <div className="flex gap-6 text-sm text-right">
-          {loss !== undefined && (
+          {loss != null && (
             <div>
               <div className="text-muted">Loss</div>
               <div className="font-mono">{loss.toFixed(4)}</div>
             </div>
           )}
-          {accuracy !== undefined && (
+          {accuracy != null && (
             <div>
               <div className="text-muted">Accuracy</div>
               <div className="font-mono text-accent-emerald">{(accuracy * 100).toFixed(2)}%</div>

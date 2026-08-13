@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import ScatterPlot from '../components/ScatterPlot';
 import SampleTable from '../components/SampleTable';
 import SampleCard from '../components/SampleCard';
@@ -45,10 +45,10 @@ export default function Explorer() {
     }
   }, [selectedRun]);
 
-  const handlePointClick = (index) => {
+  const handlePointClick = useCallback((index) => {
     const sample = data.find(d => d.sample_index === index);
     if (sample) setSelectedSample(sample);
-  };
+  }, [data]);
 
   const toggleFilter = (cat) => {
     setFilters(prev => ({ ...prev, [cat]: !prev[cat] }));
@@ -122,37 +122,34 @@ export default function Explorer() {
         {loading && <span className="ml-4 text-sm text-accent-blue animate-pulse">Loading data...</span>}
       </div>
 
-      <div className="flex-1 flex gap-4 min-h-0">
-        {/* Main Area: Scatter + Table */}
-        <div className="flex-1 flex flex-col gap-4 min-w-0">
-          <div className="h-2/3 relative">
+      <div className="flex-1 flex flex-col gap-4 min-h-0">
+        {/* Top Area: Scatter + Sidebar */}
+        <div className="flex-1 flex gap-4 min-h-0">
+          <div className="flex-1 relative min-w-0">
             {loading ? (
               <div className="absolute inset-0 flex items-center justify-center glass-panel">Loading Plot...</div>
             ) : (
-              <ScatterPlot data={filteredData} onPointClick={handlePointClick} />
+              <ScatterPlot key={JSON.stringify(filters)} data={filteredData} onPointClick={handlePointClick} />
             )}
           </div>
-          <div className="h-1/3 overflow-hidden rounded-xl border border-glass">
-            <div className="h-full overflow-y-auto custom-scrollbar bg-glass">
-              <SampleTable samples={filteredData.slice(0, 100)} onRowClick={setSelectedSample} />
-            </div>
-          </div>
-        </div>
-
-        {/* Sidebar: Sample Details */}
-        <div className="w-80 shrink-0">
-          {selectedSample ? (
-            <SampleCard 
-              sample={selectedSample} 
-              datasetId={selectedRun?.dataset_id}
-              onClose={() => setSelectedSample(null)} 
-            />
-          ) : (
-            <div className="glass-card h-full flex flex-col items-center justify-center text-center p-6 text-muted border-dashed border-2 bg-transparent">
-              <div className="text-4xl mb-4 opacity-50"><CursorClickIcon size={40} /></div>
-              <p>Click a point on the scatter plot or a row in the table to view sample details.</p>
+          
+          {/* Sidebar: Sample Details */}
+          {selectedSample && (
+            <div className="shrink-0" style={{ width: '400px' }}>
+              <SampleCard 
+                sample={selectedSample} 
+                datasetId={selectedRun?.dataset_id}
+                onClose={() => setSelectedSample(null)} 
+              />
             </div>
           )}
+        </div>
+
+        {/* Bottom Area: Table */}
+        <div className="h-1/3 min-h-[250px] overflow-hidden rounded-xl border border-glass shrink-0">
+          <div className="h-full overflow-y-auto custom-scrollbar bg-glass">
+            <SampleTable samples={filteredData.slice(0, 100)} onRowClick={setSelectedSample} />
+          </div>
         </div>
       </div>
     </div>

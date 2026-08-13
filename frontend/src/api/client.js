@@ -11,11 +11,15 @@ const BASE_URL = '/api';
 async function request(path, options = {}) {
   const res = await fetch(`${BASE_URL}${path}`, {
     headers: { 'Content-Type': 'application/json', ...options.headers },
+    cache: 'no-store',
     ...options,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(err.detail || `Request failed: ${res.status}`);
+  }
+  if (res.status === 204) {
+    return null;
   }
   return res.json();
 }
@@ -168,7 +172,10 @@ export function useTrainingSocket(onMessage) {
     connect();
     return () => {
       clearTimeout(reconnectTimer.current);
-      wsRef.current?.close();
+      if (wsRef.current) {
+        wsRef.current.onclose = null; // Prevent reconnect loop
+        wsRef.current.close();
+      }
     };
   }, [connect]);
 

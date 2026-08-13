@@ -14,12 +14,37 @@ export default function Training() {
   const [progress, setProgress] = useState(0);
   const [metrics, setMetrics] = useState({ loss: null, acc: null, epoch: 0 });
 
-  // Load datasets on mount
+  // Load datasets and check running status on mount
   React.useEffect(() => {
     api.listDatasets().then(ds => {
       setDatasets(ds || []);
       if (ds?.length > 0 && !config.dataset_id) {
         setConfig(prev => ({ ...prev, dataset_id: ds[0].id }));
+      }
+    }).catch(() => {});
+
+    api.getTrainingStatus().then(async (statusRes) => {
+      if (statusRes && statusRes.status === 'running') {
+        setStatus('training');
+        setRunId(statusRes.id);
+        try {
+          const runDetails = await api.getTrainingRun(statusRes.id);
+          if (runDetails) {
+            setProgress(runDetails.current_epoch ? (runDetails.current_epoch / runDetails.epochs) * 100 : 0);
+            setConfig(prev => ({
+              ...prev,
+              dataset_id: runDetails.dataset_id || prev.dataset_id,
+              model_name: runDetails.model_name || prev.model_name,
+              epochs: runDetails.epochs || prev.epochs,
+              learning_rate: runDetails.learning_rate || prev.learning_rate
+            }));
+            setMetrics({
+              loss: runDetails.train_loss,
+              acc: runDetails.val_accuracy,
+              epoch: runDetails.current_epoch
+            });
+          }
+        } catch (e) {}
       }
     }).catch(() => {});
   }, []);
@@ -30,6 +55,9 @@ export default function Training() {
       setProgress(msg.progress || 0);
       setMetrics({ loss: msg.train_loss, acc: msg.val_accuracy, epoch: msg.epoch });
       setHistory(prev => [...prev, { epoch: msg.epoch, loss: msg.train_loss, accuracy: msg.val_accuracy }]);
+    } else if (msg.status === 'computing_valuations' || msg.status === 'storing_results') {
+      setStatus(msg.status);
+      setProgress(100);
     } else if (msg.status === 'completed') {
       setStatus('completed');
       setProgress(100);
@@ -133,16 +161,19 @@ export default function Training() {
 
         {/* Status & Charts */}
         <div className="lg:col-span-2 space-y-6">
-          {(status === 'training' || status === 'completed') && (
-            <ProgressBar 
-              progress={progress} 
-              epoch={metrics.epoch} 
-              totalEpochs={config.epochs}
-              loss={metrics.loss}
-              accuracy={metrics.acc}
-              eta={status === 'training' ? '5m 30s' : 'Done'}
-            />
-          )}
+          <ProgressBar 
+            progress={progress} 
+            epoch={metrics.epoch} 
+            totalEpochs={config.epochs}
+            loss={metrics.loss}
+            accuracy={metrics.acc}
+            eta={
+              status === 'idle' ? 'Ready to start' :
+              status === 'training' ? '5m 30s' : 
+              status === 'computing_valuations' ? 'Computing TracIn & Embeddings...' :
+              status === 'storing_results' ? 'Saving results to DB...' : 'Done'
+            }
+          />
 
           <div className="glass-panel p-5 h-80 flex flex-col relative">
             {status === 'idle' && history.length === 0 && (

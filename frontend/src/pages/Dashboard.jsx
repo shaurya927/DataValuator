@@ -26,32 +26,41 @@ export default function Dashboard() {
   const [runs, setRuns] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [latestRunId, setLatestRunId] = useState(null);
+  const [selectedRunId, setSelectedRunId] = useState('');
+  const [completedRuns, setCompletedRuns] = useState([]);
 
   useEffect(() => {
-    loadData();
+    loadHistory();
   }, []);
 
-  async function loadData() {
+  async function loadHistory() {
     setLoading(true);
     try {
       const history = await api.getTrainingHistory().catch(() => []);
       setRuns(Array.isArray(history) ? history : []);
 
-      // Load summary from the most recent completed run
       const completed = (Array.isArray(history) ? history : []).filter(r => r.status === 'completed');
+      setCompletedRuns(completed);
       if (completed.length > 0) {
-        const latestRun = completed[0];
-        setLatestRunId(latestRun.id);
-        const summ = await api.getValuationSummary(latestRun.id).catch(() => null);
-        setSummary(summ);
+        setSelectedRunId(completed[0].id);
+      } else {
+        setLoading(false);
       }
     } catch (e) {
       console.error('Failed to load dashboard data:', e);
-    } finally {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (selectedRunId) {
+      setLoading(true);
+      api.getValuationSummary(selectedRunId)
+        .then(summ => setSummary(summ))
+        .catch(() => setSummary(null))
+        .finally(() => setLoading(false));
+    }
+  }, [selectedRunId]);
 
   const categories = summary?.category_counts || {};
   const total = summary?.total_samples || 0;
@@ -91,6 +100,22 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Header & Run Selector */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Overview</h2>
+        <select 
+          className="bg-dark/50 border border-white/10 rounded-md px-3 py-2 text-white outline-none max-w-xs"
+          value={selectedRunId}
+          onChange={(e) => setSelectedRunId(e.target.value)}
+        >
+          {completedRuns.map(r => (
+            <option key={r.id} value={r.id}>
+              {r.model_name} (Acc: {r.val_accuracy?.toFixed(3)}) - {new Date(r.started_at).toLocaleString()}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {/* Metric cards row */}
       <div className="grid grid-cols-1 gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
         <MetricCard title="Total Samples" value={total} icon={<BarChartIcon size={24} />} color="blue" />
@@ -173,8 +198,8 @@ export default function Dashboard() {
             <button onClick={() => navigate('/explorer')} className="btn btn-secondary" style={{ flex: 1, padding: 'var(--space-4)' }}>
               <SearchIcon size={16} /> Explore Data
             </button>
-            {latestRunId && (
-              <button onClick={() => api.exportRefinedDataset(latestRunId)} className="btn btn-primary" style={{ flex: 1, padding: 'var(--space-4)', background: 'var(--accent-emerald)' }}>
+            {selectedRunId && (
+              <button onClick={() => api.exportRefinedDataset(selectedRunId)} className="btn btn-primary" style={{ flex: 1, padding: 'var(--space-4)', background: 'var(--accent-emerald)' }}>
                 <DownloadIcon size={16} /> Download Refined Dataset
               </button>
             )}

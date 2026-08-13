@@ -43,7 +43,9 @@ class DataValuatorTrainer:
         config: Dict[str, Any],
         device: Optional[str] = None,
         progress_callback: Optional[Callable] = None,
+        cancel_event: Optional[Any] = None,
     ):
+        self.cancel_event = cancel_event
         if device is None:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
@@ -101,6 +103,10 @@ class DataValuatorTrainer:
             os.makedirs(save_dir, exist_ok=True)
 
         for epoch in range(self.max_epochs):
+            if self.cancel_event and self.cancel_event.is_set():
+                print("Training cancelled via event.")
+                break
+
             # ---- Training pass ---- #
             self.model.train()
             train_loss_sum = 0.0

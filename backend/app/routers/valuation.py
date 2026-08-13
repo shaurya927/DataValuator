@@ -5,8 +5,9 @@ import csv
 import io
 
 from app.config import Settings, get_settings
-from app.database import get_valuation_summary, get_valuations, get_all_valuations, get_refined_valuations
+from app.database import get_valuation_summary, get_valuations, get_all_valuations, get_refined_valuations, get_valuation_by_index, get_valuation_count
 from app.models.valuation import ValuationSummary, SampleListResponse, SampleValuation, DistributionData, EmbeddingPoint
+import numpy as np
 
 router = APIRouter(prefix="/api/valuation", tags=["valuation"])
 
@@ -51,20 +52,28 @@ async def get_samples(
     settings: Settings = Depends(get_settings)
 ):
     offset = (page - 1) * per_page
-    vals = await get_valuations(settings.DB_PATH, run_id, limit=per_page, offset=offset)
+    vals = await get_valuations(settings.DB_PATH, run_id, limit=per_page, offset=offset, sort_by=sort_by, sort_order=sort_order, category_filter=category_filter)
+    total = await get_valuation_count(settings.DB_PATH, run_id, category_filter)
     samples = [SampleValuation(**v) for v in vals]
-    return SampleListResponse(total=1000, samples=samples)
+    return SampleListResponse(total=total, samples=samples)
 
 @router.get("/{run_id}/sample/{sample_index}", response_model=SampleValuation)
 async def get_single_sample(run_id: str, sample_index: int, settings: Settings = Depends(get_settings)):
-    vals = await get_valuations(settings.DB_PATH, run_id, limit=1)
-    if not vals:
+    val = await get_valuation_by_index(settings.DB_PATH, run_id, sample_index)
+    if not val:
         raise HTTPException(status_code=404, detail="Not found")
-    return SampleValuation(**vals[0])
+    return SampleValuation(**val)
 
 @router.get("/{run_id}/distribution", response_model=List[DistributionData])
 async def get_distribution(run_id: str, settings: Settings = Depends(get_settings)):
-    return [DistributionData(metric="unified_score", bins=[0.1, 0.5, 0.9], counts=[10, 50, 10])]
+    vals = await get_all_valuations(settings.DB_PATH, run_id)
+    if not vals:
+        return []
+    scores = [v.get("unified_score", 0.0) for v in vals if v.get("unified_score") is not None]
+    if not scores:
+        return []
+    counts, bin_edges = np.histogram(scores, bins=10, range=(0.0, 1.0))
+    return [DistributionData(metric="unified_score", bins=bin_edges[:-1].tolist(), counts=counts.tolist())]
 
 @router.get("/{run_id}/embeddings", response_model=List[EmbeddingPoint])
 async def get_embeddings(run_id: str, settings: Settings = Depends(get_settings)):
@@ -106,7 +115,17 @@ async def export_refined_dataset(
         
     ds = await get_dataset(settings.DB_PATH, run['dataset_id'])
     if not ds:
-        raise HTTPException(status_code=404, detail="Dataset not found")
+        # Fallback to exporting valuations if the original dataset was deleted
+        exclude_categories = [c.strip() for c in exclude.split(",") if c.strip()]
+        rows = await get_refined_valuations(settings.DB_PATH, run_id, exclude_categories)
+        if not rows:
+            raise HTTPException(status_code=404, detail="No valuations found for this run")
+        csv_content = _build_csv(rows)
+        return Response(
+            content=csv_content,
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=refined_valuations_{run_id[:8]}.csv"},
+        )
 
     exclude_categories = [c.strip() for c in exclude.split(",") if c.strip()]
     rows = await get_refined_valuations(settings.DB_PATH, run_id, exclude_categories)

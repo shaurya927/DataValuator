@@ -1,5 +1,6 @@
 """Background job orchestrator for training and experiment pipelines."""
 import asyncio
+import threading
 import uuid
 import os
 import json
@@ -21,7 +22,7 @@ class JobManager:
 
     def __init__(self):
         self.current_job: Optional[Dict[str, Any]] = None
-        self.cancel_event = asyncio.Event()
+        self.cancel_event = threading.Event()
 
     # ------------------------------------------------------------------ #
     #  Training pipeline                                                  #
@@ -98,6 +99,7 @@ class JobManager:
                 config_dict.get("checkpoint_interval", settings.CHECKPOINT_INTERVAL),
                 progress_callback,
                 ds_meta.get("sample_shape"),
+                self.cancel_event,
             )
 
             if self.cancel_event.is_set():
@@ -113,7 +115,7 @@ class JobManager:
             valuation_data = await asyncio.to_thread(
                 self._compute_valuations,
                 model_name, ds_meta["num_classes"], checkpoint_dir,
-                train_loader, val_loader, trainer_results,
+                train_loader, val_loader, trainer_results, lr,
             )
 
             # ---------- 4. Store results ---------- #
@@ -214,7 +216,8 @@ class JobManager:
     @staticmethod
     def _train_model(model_name, num_classes, train_loader, val_loader,
                      epochs, lr, checkpoint_dir, metrics_path,
-                     checkpoint_interval, progress_callback, sample_shape=None):
+                     checkpoint_interval, progress_callback, sample_shape=None,
+                     cancel_event=None):
         """Run the training loop — blocking, runs in thread."""
         from app.engine.models import get_model
         from app.engine.trainer import DataValuatorTrainer
@@ -239,6 +242,7 @@ class JobManager:
             val_loader=val_loader,
             config=config,
             progress_callback=progress_callback,
+            cancel_event=cancel_event,
         )
 
         tracker_results = trainer.train()
@@ -252,7 +256,7 @@ class JobManager:
 
     @staticmethod
     def _compute_valuations(model_name, num_classes, checkpoint_dir,
-                            train_loader, val_loader, trainer_results):
+                            train_loader, val_loader, trainer_results, configured_lr):
         """Post-training valuation: TracIn + embeddings + unified scores."""
         import torch
         from app.engine.models import get_model
@@ -267,17 +271,24 @@ class JobManager:
 
         # Collect checkpoint paths and learning rates
         checkpoint_files = sorted([
-            f for f in os.listdir(checkpoint_dir) if f.endswith(".pt")
+            f for f in os.listdir(checkpoint_dir) if f.endswith(".pt") and f != "ckpt_final.pt"
         ])
         checkpoint_paths = [os.path.join(checkpoint_dir, f) for f in checkpoint_files]
 
         # TracIn scores
         if len(checkpoint_paths) >= 2:
-            # Use uniform learning rate estimate for simplicity
-            lrs = [0.01] * len(checkpoint_paths)
+            lrs = []
+            for path in checkpoint_paths:
+                ckpt = torch.load(path, map_location="cpu", weights_only=True)
+                lrs.append(ckpt.get("learning_rate", configured_lr))
+
+            kwargs = {}
+            if model_name == 'tabular':
+                # Tabular needs input_dim, we can infer it from the trained model
+                kwargs['input_dim'] = model.fc1.in_features
+
             tracin_scores = compute_tracin_scores(
-                model_class=type(model),
-                model_kwargs={"num_classes": num_classes},
+                model_factory=lambda: get_model(model_name, num_classes, **kwargs),
                 checkpoint_paths=checkpoint_paths,
                 learning_rates=lrs,
                 train_loader=train_loader,

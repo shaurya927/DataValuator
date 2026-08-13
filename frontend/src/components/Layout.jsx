@@ -142,7 +142,9 @@ const styles = {
     color: 'var(--text-secondary)',
     textDecoration: 'none',
     transition: 'all var(--transition-fast)',
-    borderLeft: '2px solid transparent',
+    borderLeftWidth: '2px',
+    borderLeftStyle: 'solid',
+    borderLeftColor: 'transparent',
     whiteSpace: 'nowrap',
   },
   navLinkActive: {

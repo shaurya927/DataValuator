@@ -9,9 +9,9 @@
   --border-light: rgba(255, 255, 255, 0.05);
 
   /* Text Colors */
-  --text-primary: #F8FAFC;
-  --text-secondary: #94A3B8;
-  --text-muted: #64748B;
+  --text-primary: #FFFFFF;
+  --text-secondary: #E2E8F0;
+  --text-muted: #94A3B8;
   --text-inverse: #020617;
 
   /* Accent Colors */
@@ -40,13 +40,13 @@
   /* Typography */
   --font-family: 'Inter', system-ui, -apple-system, sans-serif;
   --font-heading: 'Outfit', 'Inter', system-ui, sans-serif;
-  --font-xs: 0.75rem;
-  --font-sm: 0.875rem;
-  --font-base: 1rem;
-  --font-lg: 1.125rem;
-  --font-xl: 1.25rem;
-  --font-2xl: 1.5rem;
-  --font-3xl: 2rem;
+  --font-xs: 0.85rem;
+  --font-sm: 0.95rem;
+  --font-base: 1.05rem;
+  --font-lg: 1.15rem;
+  --font-xl: 1.3rem;
+  --font-2xl: 1.6rem;
+  --font-3xl: 2.2rem;
 
   /* Spacing */
   --space-1: 4px;

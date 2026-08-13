@@ -1,10 +1,41 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ImageIcon } from './Icons';
 
 export default function SampleCard({ sample, datasetId, onClose }) {
-  if (!sample) return null;
+  const [previewData, setPreviewData] = useState(null);
+  const [previewType, setPreviewType] = useState('loading'); // 'loading', 'image', 'tabular', 'error'
+  const imageUrl = datasetId ? `/api/datasets/${datasetId}/data/${sample?.sample_index}` : null;
 
-  const imageUrl = datasetId ? `/api/datasets/${datasetId}/data/${sample.sample_index}` : null;
+  useEffect(() => {
+    if (!datasetId || !sample) return;
+    
+    let isMounted = true;
+    const fetchPreview = async () => {
+      setPreviewType('loading');
+      try {
+        const res = await fetch(`/api/datasets/${datasetId}/data/${sample.sample_index}`);
+        if (!res.ok) throw new Error('Failed to fetch');
+        
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const json = await res.json();
+          if (isMounted) {
+            setPreviewData(json.data);
+            setPreviewType('tabular');
+          }
+        } else {
+          if (isMounted) setPreviewType('image');
+        }
+      } catch (e) {
+        if (isMounted) setPreviewType('error');
+      }
+    };
+    
+    fetchPreview();
+    return () => { isMounted = false; };
+  }, [datasetId, sample]);
+
+  if (!sample) return null;
 
   return (
     <div className="glass-card flex flex-col h-full overflow-y-auto">
@@ -25,18 +56,24 @@ export default function SampleCard({ sample, datasetId, onClose }) {
       </div>
 
       {/* Image / Data Preview Placeholder */}
-      <div className="w-full aspect-square bg-surface rounded-lg mb-6 flex items-center justify-center border border-glass overflow-hidden relative">
-        {imageUrl ? (
+      <div className="w-full bg-surface rounded-lg mb-6 flex items-center justify-center border border-glass overflow-hidden relative" style={{ aspectRatio: '1 / 1' }}>
+        {previewType === 'loading' && <div className="text-muted animate-pulse">Loading preview...</div>}
+        {previewType === 'error' && <div className="text-4xl text-muted opacity-50"><ImageIcon size={40} /></div>}
+        {previewType === 'image' && imageUrl && (
           <img src={imageUrl} alt={`Sample ${sample.sample_index}`} className="w-full h-full object-cover" />
-        ) : (
-          <div className="text-4xl text-muted opacity-50"><ImageIcon size={40} /></div>
         )}
-        <div className="absolute bottom-0 left-0 w-full bg-black/50 backdrop-blur-sm p-2 flex justify-between text-xs font-mono">
-          <span>True: <span className="text-accent-emerald">{sample.true_label ?? '-'}</span></span>
-          <span>Pred: <span className={sample.true_label === sample.pred_label ? 'text-accent-emerald' : 'text-accent-rose'}>
-            {sample.pred_label ?? '-'}
-          </span></span>
-        </div>
+        {previewType === 'tabular' && previewData && (
+          <div className="w-full h-full overflow-y-auto p-4 text-xs font-mono bg-black/20 custom-scrollbar pb-10 text-left">
+            {typeof previewData === 'object' ? Object.entries(previewData).map(([k, v]) => (
+              <div key={k} className="flex flex-col mb-2 border-b border-glass pb-1">
+                <span className="text-muted">{k}</span>
+                <span className="truncate text-secondary" title={String(v)}>{String(v)}</span>
+              </div>
+            )) : (
+              <div className="text-secondary">{String(previewData)}</div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="space-y-4">
@@ -57,9 +94,9 @@ function MetricRow({ label, value, max = 1, isHighlight, isInteger }) {
   
   return (
     <div>
-      <div className="flex justify-between text-sm mb-1">
-        <span className="text-muted">{label}</span>
-        <span className={`font-mono ${isHighlight ? 'text-accent-blue font-bold' : ''}`}>{displayValue}</span>
+      <div className="flex justify-between text-sm mb-1 gap-2">
+        <span className="text-muted truncate" title={label}>{label}</span>
+        <span className={`font-mono shrink-0 ${isHighlight ? 'text-accent-blue font-bold' : ''}`}>{displayValue}</span>
       </div>
       <div className="w-full h-1.5 bg-surface rounded-full overflow-hidden">
         <div 

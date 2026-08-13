@@ -37,8 +37,8 @@ def load_cifar10(data_dir: str, batch_size: int = 128) -> Tuple[DataLoader, Data
     indexed_train = IndexedDataset(train_set)
     indexed_val = IndexedDataset(val_set)
 
-    train_loader = DataLoader(indexed_train, batch_size=batch_size, shuffle=True, num_workers=2)
-    val_loader = DataLoader(indexed_val, batch_size=batch_size, shuffle=False, num_workers=2)
+    train_loader = DataLoader(indexed_train, batch_size=batch_size, shuffle=True, num_workers=0)
+    val_loader = DataLoader(indexed_val, batch_size=batch_size, shuffle=False, num_workers=0)
 
     dataset_info = {
         "num_samples": len(train_set),
@@ -79,8 +79,8 @@ def load_image_folder(path: str, batch_size: int = 64, img_size: int = 32) -> Tu
     indexed_train = IndexedDataset(train_set)
     indexed_val = IndexedDataset(val_set)
 
-    train_loader = DataLoader(indexed_train, batch_size=batch_size, shuffle=True, num_workers=2)
-    val_loader = DataLoader(indexed_val, batch_size=batch_size, shuffle=False, num_workers=2)
+    train_loader = DataLoader(indexed_train, batch_size=batch_size, shuffle=True, num_workers=0)
+    val_loader = DataLoader(indexed_val, batch_size=batch_size, shuffle=False, num_workers=0)
 
     classes = train_set.dataset.classes if hasattr(train_set, 'dataset') else train_set.classes
     dataset_info = {
@@ -116,7 +116,8 @@ def load_csv_dataset(path: str, target_col: str, batch_size: int = 64) -> Tuple[
     y = df[target_col].astype('category').cat.codes.values
     classes = df[target_col].astype('category').cat.categories.tolist()
 
-    indices = np.random.permutation(len(X))
+    rng = np.random.RandomState(42)
+    indices = rng.permutation(len(X))
     split_idx = int(0.8 * len(X))
     train_idx, val_idx = indices[:split_idx], indices[split_idx:]
 

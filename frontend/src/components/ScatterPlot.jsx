@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import Plot from 'react-plotly.js';
 
-export default function ScatterPlot({ data, onPointClick }) {
+export default React.memo(function ScatterPlot({ data, onPointClick }) {
   // Map categories to design system colors
   const colorMap = {
     high_value: '#10B981',
@@ -11,26 +11,28 @@ export default function ScatterPlot({ data, onPointClick }) {
     suspicious: '#8B5CF6'
   };
 
-  const traces = Object.keys(colorMap).map(category => {
-    const catData = data.filter(d => d.category === category);
-    return {
-      x: catData.map(d => d.embedding_x || d.x),
-      y: catData.map(d => d.embedding_y || d.y),
-      text: catData.map(d => `Index: ${d.sample_index ?? d.index}<br>Category: ${category}`),
-      mode: 'markers',
-      type: 'scatter',
-      name: category.replace('_', ' '),
-      marker: {
-        color: colorMap[category],
-        size: 6,
-        opacity: 0.7,
-        line: { width: 0 }
-      },
-      customdata: catData.map(d => d.sample_index ?? d.index)
-    };
-  });
+  const traces = useMemo(() => {
+    return Object.keys(colorMap).map(category => {
+      const catData = data.filter(d => d.category === category);
+      return {
+        x: catData.map(d => d.embedding_x ?? d.x),
+        y: catData.map(d => d.embedding_y ?? d.y),
+        text: catData.map(d => `Index: ${d.sample_index ?? d.index}<br>Category: ${category}`),
+        mode: 'markers',
+        type: 'scatter',
+        name: category.replace('_', ' '),
+        marker: {
+          color: colorMap[category],
+          size: 6,
+          opacity: 0.7,
+          line: { width: 0 }
+        },
+        customdata: catData.map(d => d.sample_index ?? d.index)
+      };
+    });
+  }, [data]);
 
-  const layout = {
+  const layout = useMemo(() => ({
     paper_bgcolor: 'rgba(0,0,0,0)',
     plot_bgcolor: 'rgba(0,0,0,0)',
     font: { color: '#94A3B8', family: 'Inter' },
@@ -51,7 +53,7 @@ export default function ScatterPlot({ data, onPointClick }) {
       font: { color: '#F8FAFC' }
     },
     hovermode: 'closest'
-  };
+  }), []);
 
   const handleClick = (e) => {
     if (e.points && e.points[0] && onPointClick) {
@@ -61,10 +63,11 @@ export default function ScatterPlot({ data, onPointClick }) {
   };
 
   return (
-    <div className="glass-panel w-full h-[500px] overflow-hidden">
+    <div className="glass-panel w-full overflow-hidden" style={{ height: '100%', minHeight: '400px' }}>
       <Plot
         data={traces}
-        layout={layout}
+        layout={{ ...layout, datarevision: data.length }}
+        revision={data.length}
         config={{ displayModeBar: true, responsive: true }}
         onClick={handleClick}
         style={{ width: '100%', height: '100%' }}
@@ -72,4 +75,4 @@ export default function ScatterPlot({ data, onPointClick }) {
       />
     </div>
   );
-}
+});

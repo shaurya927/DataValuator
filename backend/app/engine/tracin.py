@@ -15,8 +15,7 @@ import torch.nn.functional as F
 
 
 def compute_tracin_scores(
-    model_class: Type[nn.Module],
-    model_kwargs: Dict[str, Any],
+    model_factory: Callable[[], nn.Module],
     checkpoint_paths: List[str],
     learning_rates: List[float],
     train_loader: Any,
@@ -33,8 +32,7 @@ def compute_tracin_scores(
     negative or near-zero scores may indicate harmful/redundant samples.
 
     Args:
-        model_class: The model class (not an instance) for instantiation.
-        model_kwargs: Keyword args for model_class (e.g., num_classes).
+        model_factory: A callable that returns a new instance of the model.
         checkpoint_paths: List of checkpoint file paths.
         learning_rates: Learning rate at each checkpoint (same length).
         train_loader: DataLoader yielding (index, data, target).
@@ -49,7 +47,7 @@ def compute_tracin_scores(
     device_t = torch.device(device)
 
     for ckpt_idx, (ckpt_path, lr) in enumerate(zip(checkpoint_paths, learning_rates)):
-        model = model_class(**model_kwargs)
+        model = model_factory()
 
         # Handle both raw state_dict and wrapped checkpoint formats
         checkpoint = torch.load(ckpt_path, map_location=device_t, weights_only=True)
