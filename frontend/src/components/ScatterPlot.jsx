@@ -4,11 +4,11 @@ import Plot from 'react-plotly.js';
 export default React.memo(function ScatterPlot({ data, onPointClick }) {
   // Map categories to design system colors
   const colorMap = {
-    high_value: '#10B981',
-    normal: '#3B82F6',
-    redundant: '#F59E0B',
-    harmful: '#F43F5E',
-    suspicious: '#8B5CF6'
+    high_value: '#34d399',
+    normal: '#2dd4bf',
+    redundant: '#fbbf24',
+    harmful: '#fb7185',
+    suspicious: '#a78bfa'
   };
 
   const traces = useMemo(() => {
@@ -35,22 +35,22 @@ export default React.memo(function ScatterPlot({ data, onPointClick }) {
   const layout = useMemo(() => ({
     paper_bgcolor: 'rgba(0,0,0,0)',
     plot_bgcolor: 'rgba(0,0,0,0)',
-    font: { color: '#94A3B8', family: 'Inter' },
+    font: { color: '#a0a0a0', family: 'Inter' },
     margin: { l: 40, r: 20, t: 30, b: 40 },
     xaxis: { 
-      gridcolor: 'rgba(148, 163, 184, 0.1)',
-      zerolinecolor: 'rgba(148, 163, 184, 0.2)'
+      gridcolor: 'rgba(255, 255, 255, 0.04)',
+      zerolinecolor: 'rgba(255, 255, 255, 0.06)'
     },
     yaxis: { 
-      gridcolor: 'rgba(148, 163, 184, 0.1)',
-      zerolinecolor: 'rgba(148, 163, 184, 0.2)'
+      gridcolor: 'rgba(255, 255, 255, 0.04)',
+      zerolinecolor: 'rgba(255, 255, 255, 0.06)'
     },
     legend: {
       orientation: 'h',
       y: -0.15,
       x: 0.5,
       xanchor: 'center',
-      font: { color: '#F8FAFC' }
+      font: { color: '#e8e8e8' }
     },
     hovermode: 'closest'
   }), []);

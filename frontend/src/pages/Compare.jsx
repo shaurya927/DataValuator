@@ -3,11 +3,11 @@ import { api } from '../api/client';
 import { BarChartIcon, ActivityIcon, SearchIcon, LayersIcon, RefreshIcon } from '../components/Icons';
 
 const CATEGORY_COLORS = {
-  high_value: '#10B981',
-  normal: '#3B82F6',
-  redundant: '#F59E0B',
-  harmful: '#F43F5E',
-  suspicious: '#8B5CF6',
+  high_value: 'var(--accent-emerald, #34d399)',
+  normal: 'var(--accent-blue, #2dd4bf)',
+  redundant: 'var(--accent-amber, #fbbf24)',
+  harmful: 'var(--accent-rose, #fb7185)',
+  suspicious: 'var(--accent-violet, #a78bfa)',
 };
 
 const CATEGORY_LABELS = {
@@ -67,7 +67,7 @@ export default function Compare() {
           return (
             <div 
               key={cat} 
-              style={{ width: `${pct}%`, backgroundColor: CATEGORY_COLORS[cat] || '#888' }} 
+              style={{ width: `${pct}%`, backgroundColor: CATEGORY_COLORS[cat] || '#5a5a5a' }} 
               title={`${CATEGORY_LABELS[cat] || cat}: ${count}`}
             />
           );

@@ -185,9 +185,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     padding: '0 var(--space-6)',
-    background: 'rgba(30, 41, 59, 0.5)',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
+    background: 'var(--bg-glass)',
   },
   pageTitle: {
     fontSize: 'var(--font-xl)',

@@ -121,7 +121,7 @@ export default function Experiments() {
     <div className="space-y-6">
       
       {errorMsg && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-lg">
+        <div className="border p-4 rounded-lg" style={{ backgroundColor: 'var(--cat-harmful-bg)', borderColor: 'var(--accent-rose)', color: 'var(--accent-rose)' }}>
           {errorMsg}
         </div>
       )}
@@ -294,7 +294,14 @@ export default function Experiments() {
                     <td className="px-4 py-3 font-medium capitalize">{item.type}</td>
                     <td className="px-4 py-3 text-muted" title={item.run_id}>{item.run_id?.substring(0, 8)}...</td>
                     <td className="px-4 py-3">
-                      <span className={`badge ${item.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' : item.status === 'failed' ? 'bg-rose-500/20 text-rose-400' : 'bg-blue-500/20 text-blue-400'} px-2 py-1 rounded text-xs`}>
+                      <span 
+                        className="badge px-2 py-1 rounded text-xs"
+                        style={
+                          item.status === 'completed' ? { backgroundColor: 'var(--cat-high-value-bg)', color: 'var(--accent-emerald)' } :
+                          item.status === 'failed' ? { backgroundColor: 'var(--cat-harmful-bg)', color: 'var(--accent-rose)' } :
+                          { backgroundColor: 'var(--accent-blue-alpha)', color: 'var(--accent-blue)' }
+                        }
+                      >
                         {item.status}
                       </span>
                     </td>

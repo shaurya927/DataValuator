@@ -48,7 +48,7 @@ const typeStyles = {
   success: { color: '#10b981', glow: 'rgba(16, 185, 129, 0.2)', icon: <SuccessIcon /> },
   error: { color: '#f43f5e', glow: 'rgba(244, 63, 94, 0.2)', icon: <ErrorIcon /> },
   warning: { color: '#f59e0b', glow: 'rgba(245, 158, 11, 0.2)', icon: <WarningIcon /> },
-  info: { color: '#3b82f6', glow: 'rgba(59, 130, 246, 0.2)', icon: <InfoIcon /> }
+  info: { color: '#2dd4bf', glow: 'rgba(45, 212, 191, 0.2)', icon: <InfoIcon /> }
 };
 
 const Toast = ({ id, message, type, onClose }) => {
@@ -74,15 +74,15 @@ const Toast = ({ id, message, type, onClose }) => {
       display: 'flex',
       flexDirection: 'column',
       width: '320px',
-      backgroundColor: 'rgba(30, 41, 59, 0.9)',
+      backgroundColor: 'rgba(17, 17, 17, 0.95)',
       backdropFilter: 'blur(16px)',
       WebkitBackdropFilter: 'blur(16px)',
-      border: '1px solid rgba(148, 163, 184, 0.15)',
+      border: '1px solid rgba(255, 255, 255, 0.06)',
       borderRadius: '12px',
       boxShadow: `0 8px 32px 0 ${style.glow}`,
       marginBottom: '12px',
       overflow: 'hidden',
-      color: '#fff',
+      color: '#e8e8e8',
       fontFamily: 'Inter, system-ui, sans-serif',
       fontSize: '14px',
       animation: `${isLeaving ? 'toastSlideOut 0.3s forwards' : 'toastSlideIn 0.3s forwards'}`,
@@ -98,11 +98,11 @@ const Toast = ({ id, message, type, onClose }) => {
         <button 
           onClick={handleClose}
           style={{ 
-            background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer',
+            background: 'none', border: 'none', color: '#a0a0a0', cursor: 'pointer',
             padding: '2px', marginLeft: '8px', display: 'flex', alignItems: 'center'
           }}
-          onMouseOver={(e) => e.currentTarget.style.color = '#fff'}
-          onMouseOut={(e) => e.currentTarget.style.color = '#94a3b8'}
+          onMouseOver={(e) => e.currentTarget.style.color = '#e8e8e8'}
+          onMouseOut={(e) => e.currentTarget.style.color = '#a0a0a0'}
         >
           <CloseIcon />
         </button>

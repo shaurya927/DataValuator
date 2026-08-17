@@ -4,7 +4,7 @@ import { ImageIcon } from './Icons';
 export default function SampleCard({ sample, datasetId, onClose }) {
   const [previewData, setPreviewData] = useState(null);
   const [previewType, setPreviewType] = useState('loading'); // 'loading', 'image', 'tabular', 'error'
-  const imageUrl = datasetId ? `/api/datasets/${datasetId}/data/${sample?.sample_index}` : null;
+  const imageUrl = datasetId ? `/api/datasets/${datasetId}/data/${sample?.sample_index ?? sample?.index}` : null;
 
   useEffect(() => {
     if (!datasetId || !sample) return;
@@ -13,7 +13,7 @@ export default function SampleCard({ sample, datasetId, onClose }) {
     const fetchPreview = async () => {
       setPreviewType('loading');
       try {
-        const res = await fetch(`/api/datasets/${datasetId}/data/${sample.sample_index}`);
+        const res = await fetch(`/api/datasets/${datasetId}/data/${sample.sample_index ?? sample.index}`);
         if (!res.ok) throw new Error('Failed to fetch');
         
         const contentType = res.headers.get('content-type');

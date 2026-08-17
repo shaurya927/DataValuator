@@ -7,9 +7,9 @@ export default function BatchToolbar({ visible, selectedCount, onExport, onMarkC
     <div 
       className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 px-6 py-3 rounded-full shadow-2xl animate-[slideUp_0.3s_ease-out]"
       style={{ 
-        backgroundColor: 'rgba(30, 41, 59, 0.8)', 
+        backgroundColor: 'var(--bg-surface)', 
         backdropFilter: 'blur(12px)',
-        border: '1px solid rgba(148, 163, 184, 0.2)',
+        border: '1px solid var(--border-glass)',
       }}
     >
       <style>
@@ -21,28 +21,30 @@ export default function BatchToolbar({ visible, selectedCount, onExport, onMarkC
         `}
       </style>
       
-      <span className="text-sm font-medium text-white bg-blue-500/20 px-3 py-1 rounded-full">
+      <span className="text-sm font-medium text-primary px-3 py-1 rounded-full" style={{ backgroundColor: 'var(--accent-blue-alpha)' }}>
         {selectedCount} sample{selectedCount !== 1 ? 's' : ''} selected
       </span>
       
       <div className="w-px h-6 bg-gray-700" />
       
       <button 
-        className="text-sm hover:text-white transition-colors"
+        className="btn btn-secondary"
         onClick={onExport}
       >
         Export CSV
       </button>
       
       <button 
-        className="text-sm text-rose-400 hover:text-rose-300 transition-colors"
+        className="btn" 
+        style={{ backgroundColor: 'var(--cat-harmful-bg)', color: 'var(--accent-rose)', border: '1px solid rgba(251, 113, 133, 0.3)' }}
         onClick={() => onMarkCategory('harmful')}
       >
         Mark as Harmful
       </button>
       
       <button 
-        className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+        className="btn" 
+        style={{ backgroundColor: 'rgba(52, 211, 153, 0.1)', color: 'var(--accent-emerald)', border: '1px solid rgba(52, 211, 153, 0.3)' }}
         onClick={() => onMarkCategory('high_value')}
       >
         Mark as High Value
@@ -51,7 +53,7 @@ export default function BatchToolbar({ visible, selectedCount, onExport, onMarkC
       <div className="w-px h-6 bg-gray-700" />
       
       <button 
-        className="text-sm text-gray-400 hover:text-white transition-colors"
+        className="btn btn-secondary"
         onClick={onDeselectAll}
       >
         Deselect All

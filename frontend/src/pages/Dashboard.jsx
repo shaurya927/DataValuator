@@ -6,11 +6,11 @@ import { api } from '../api/client';
 import { BarChartIcon, FolderIcon, ZapIcon, SearchIcon, RefreshIcon, AlertCircleIcon, TargetIcon, ActivityIcon, InboxIcon, DownloadIcon } from '../components/Icons';
 
 const CATEGORY_COLORS = {
-  high_value: '#10B981',
-  normal: '#3B82F6',
-  redundant: '#F59E0B',
-  harmful: '#F43F5E',
-  suspicious: '#8B5CF6',
+  high_value: '#34d399',
+  normal: '#2dd4bf',
+  redundant: '#fbbf24',
+  harmful: '#fb7185',
+  suspicious: '#a78bfa',
 };
 
 const CATEGORY_LABELS = {
@@ -71,7 +71,7 @@ export default function Dashboard() {
   const pieData = Object.entries(categories).map(([key, val]) => ({
     name: CATEGORY_LABELS[key] || key,
     value: val,
-    color: CATEGORY_COLORS[key] || '#64748B',
+    color: CATEGORY_COLORS[key] || '#5a5a5a',
   }));
 
   const usablePct = total > 0

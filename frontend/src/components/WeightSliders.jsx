@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 
 const METRICS = [
-  { key: 'forgetting', label: 'Forgetting', tooltip: 'Impact of catastrophic forgetting', color: 'rgb(245, 158, 11)' },
-  { key: 'loss', label: 'Loss', tooltip: 'Average loss contribution', color: 'rgb(244, 63, 94)' },
-  { key: 'aum', label: 'AUM', tooltip: 'Area under the margin', color: 'rgb(59, 130, 246)' },
-  { key: 'tracin', label: 'TracIn', tooltip: 'Gradient-based influence', color: 'rgb(16, 185, 129)' },
-  { key: 'rarity', label: 'Rarity', tooltip: 'Data rarity score', color: 'rgb(139, 92, 246)' }
+  { key: 'forgetting', label: 'Forgetting', tooltip: 'Impact of catastrophic forgetting', color: '#fbbf24' },
+  { key: 'loss', label: 'Loss', tooltip: 'Average loss contribution', color: '#fb7185' },
+  { key: 'aum', label: 'AUM', tooltip: 'Area under the margin', color: '#2dd4bf' },
+  { key: 'tracin', label: 'TracIn', tooltip: 'Gradient-based influence', color: '#34d399' },
+  { key: 'rarity', label: 'Rarity', tooltip: 'Data rarity score', color: '#a78bfa' }
 ];
 
 const DEFAULT_WEIGHTS = { forgetting: 0.2, loss: 0.15, aum: 0.25, tracin: 0.2, rarity: 0.2 };
@@ -43,8 +43,8 @@ export default function WeightSliders({ onApply, loading }) {
     <div 
       className="glass-panel p-4 mb-4" 
       style={{ 
-        backgroundColor: 'rgba(30, 41, 59, 0.6)', 
-        borderColor: 'rgba(148, 163, 184, 0.1)',
+        backgroundColor: 'var(--bg-surface)', 
+        borderColor: 'var(--border-glass)',
         borderRadius: '12px'
       }}
     >
@@ -54,7 +54,8 @@ export default function WeightSliders({ onApply, loading }) {
       >
         <h3 className="text-sm font-medium">Scoring Weights</h3>
         <svg 
-          className={`w-5 h-5 transition-transform ${collapsed ? '' : 'rotate-180'}`} 
+          className="transition-transform" 
+          style={{ width: 20, height: 20, transform: collapsed ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.2s ease' }}
           fill="none" 
           stroke="currentColor" 
           viewBox="0 0 24 24"
@@ -77,13 +78,14 @@ export default function WeightSliders({ onApply, loading }) {
             </label>
             <div className="flex gap-2">
               <button 
-                className="px-3 py-1 text-sm rounded bg-transparent border border-glass hover:bg-glass"
+                className="btn btn-secondary"
                 onClick={handleReset}
               >
                 Reset to Defaults
               </button>
               <button 
-                className="px-3 py-1 text-sm rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+                className="btn btn-primary"
+                style={{ opacity: loading ? 0.5 : 1 }}
                 onClick={() => onApply(weights)}
                 disabled={loading}
               >
@@ -106,8 +108,7 @@ export default function WeightSliders({ onApply, loading }) {
                   step="0.01" 
                   value={weights[key]}
                   onChange={(e) => handleWeightChange(key, parseFloat(e.target.value))}
-                  className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                  style={{ accentColor: color }}
+                  style={{ width: '100%', height: '4px', backgroundColor: 'var(--bg-surface-elevated)', borderRadius: '9999px', appearance: 'none', cursor: 'pointer', accentColor: color }}
                 />
               </div>
             ))}

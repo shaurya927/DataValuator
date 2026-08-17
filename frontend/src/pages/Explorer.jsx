@@ -52,7 +52,7 @@ export default function Explorer() {
   }, [selectedRun]);
 
   const handlePointClick = useCallback((index) => {
-    const sample = data.find(d => d.sample_index === index);
+    const sample = data.find(d => (d.sample_index ?? d.index) === index);
     if (sample) setSelectedSample(sample);
   }, [data]);
 
