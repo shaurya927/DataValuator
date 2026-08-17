@@ -208,6 +208,16 @@ const LandingPage = () => {
   return (
     <div style={styles.container}>
       <div style={styles.background}>
+        <video 
+          key={isLightMode ? 'light' : 'dark'}
+          autoPlay 
+          loop 
+          muted 
+          playsInline
+          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.15, zIndex: -1 }}
+        >
+          <source src={isLightMode ? "/videos/lightmode.mp4" : "/videos/darkmode.mp4"} type="video/mp4" />
+        </video>
         {/* Decorative subtle stars/elements could go here if needed via SVG */}
         <svg width="100%" height="100%" style={{ position: 'absolute', top: 0, left: 0, opacity: 0.3 }}>
           <circle cx="15%" cy="20%" r="1" fill="var(--text-primary)" opacity="0.5" />
@@ -265,6 +275,7 @@ const LandingPage = () => {
           <p style={styles.description}>
             Somewhere out there another model just overfit. After 34 epochs, after 247, after a thousand and more. If it was yours: it can rest here, with dignity. Find the harmful samples, prune the redundant ones, and try again.
           </p>
+
         </div>
       </main>
 
