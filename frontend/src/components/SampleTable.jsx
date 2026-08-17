@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function SampleTable({ samples, onRowClick }) {
+export default function SampleTable({ samples, onRowClick, selectable = false, selectedIndices = new Set(), onSelectionChange }) {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
   const requestSort = (key) => {
@@ -33,6 +33,22 @@ export default function SampleTable({ samples, onRowClick }) {
       <table className="table">
         <thead>
           <tr>
+            {selectable && (
+              <th className="w-10">
+                <input 
+                  type="checkbox" 
+                  checked={samples.length > 0 && selectedIndices.size === samples.length}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      onSelectionChange(new Set(samples.map(s => s.sample_index ?? s.index)));
+                    } else {
+                      onSelectionChange(new Set());
+                    }
+                  }}
+                  className="accent-accent-blue"
+                />
+              </th>
+            )}
             <th onClick={() => requestSort('sample_index')}>Index {sortConfig.key === 'sample_index' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
             <th onClick={() => requestSort('category')}>Category {sortConfig.key === 'category' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
             <th onClick={() => requestSort('unified_score')}>Unified Score {sortConfig.key === 'unified_score' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
@@ -42,13 +58,35 @@ export default function SampleTable({ samples, onRowClick }) {
           </tr>
         </thead>
         <tbody>
-          {sortedSamples.map((sample) => (
-            <tr 
-              key={sample.sample_index ?? sample.index} 
-              onClick={() => onRowClick && onRowClick(sample)}
-              className={onRowClick ? 'cursor-pointer' : ''}
-            >
-              <td className="font-mono text-muted">#{sample.sample_index ?? sample.index}</td>
+          {sortedSamples.map((sample) => {
+            const index = sample.sample_index ?? sample.index;
+            const isSelected = selectedIndices.has(index);
+            return (
+              <tr 
+                key={index} 
+                onClick={() => onRowClick && onRowClick(sample)}
+                className={onRowClick ? 'cursor-pointer' : ''}
+                style={isSelected ? { backgroundColor: 'rgba(59, 130, 246, 0.1)' } : undefined}
+              >
+                {selectable && (
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <input 
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => {
+                        const newSelected = new Set(selectedIndices);
+                        if (e.target.checked) {
+                          newSelected.add(index);
+                        } else {
+                          newSelected.delete(index);
+                        }
+                        onSelectionChange(newSelected);
+                      }}
+                      className="accent-accent-blue"
+                    />
+                  </td>
+                )}
+                <td className="font-mono text-muted">#{index}</td>
               <td>
                 <span className={`badge badge-${sample.category}`}>
                   {sample.category.replace('_', ' ')}
@@ -63,7 +101,7 @@ export default function SampleTable({ samples, onRowClick }) {
               <td className="font-mono">{sample.aum_score?.toFixed(3) ?? sample.aum?.toFixed(3) ?? '-'}</td>
               <td className="font-mono">{sample.avg_loss?.toFixed(3) ?? '-'}</td>
             </tr>
-          ))}
+          )})}
           {sortedSamples.length === 0 && (
             <tr>
               <td colSpan="6" className="text-center py-8 text-muted">

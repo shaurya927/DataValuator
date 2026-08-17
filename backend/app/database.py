@@ -232,6 +232,62 @@ async def get_refined_valuations(db_path: str, run_id: str, exclude_categories: 
     ) as cursor:
         return [dict(row) for row in await cursor.fetchall()]
 
+async def update_valuation_scores(db_path, run_id: str, updates: list):
+    """Bulk update unified_score and category for a run.
+    updates is a list of (unified_score, category, sample_index) tuples."""
+    db = await get_db(db_path)
+    await db.executemany(
+        "UPDATE sample_valuations SET unified_score = ?, category = ? WHERE run_id = ? AND sample_index = ?",
+        [(score, cat, run_id, idx) for score, cat, idx in updates]
+    )
+    await db.commit()
+
+async def batch_update_category(db_path, run_id: str, sample_indices: list, category: str):
+    """Update category for specified sample indices."""
+    db = await get_db(db_path)
+    placeholders = ','.join(['?'] * len(sample_indices))
+    await db.execute(
+        f"UPDATE sample_valuations SET category = ? WHERE run_id = ? AND sample_index IN ({placeholders})",
+        [category, run_id] + sample_indices
+    )
+    await db.commit()
+
+async def get_valuation_comparison(db_path, run_a: str, run_b: str) -> list:
+    """Get side-by-side comparison of two runs' valuations joined on sample_index."""
+    db = await get_db(db_path)
+    async with db.execute(
+        """SELECT a.sample_index, 
+                  a.unified_score as score_a, a.category as cat_a,
+                  b.unified_score as score_b, b.category as cat_b
+           FROM sample_valuations a
+           INNER JOIN sample_valuations b ON a.sample_index = b.sample_index
+           WHERE a.run_id = ? AND b.run_id = ?
+           ORDER BY a.sample_index""",
+        (run_a, run_b)
+    ) as cursor:
+        return [dict(row) for row in await cursor.fetchall()]
+
+async def get_all_run_summaries(db_path) -> list:
+    """Get summaries for all completed training runs with their category counts."""
+    db = await get_db(db_path)
+    # First get completed runs
+    async with db.execute(
+        "SELECT id, model_name, val_accuracy, epochs, learning_rate, started_at FROM training_runs WHERE status = 'completed' ORDER BY started_at DESC"
+    ) as cursor:
+        runs = [dict(row) for row in await cursor.fetchall()]
+    
+    # For each run, get category counts
+    for run in runs:
+        async with db.execute(
+            "SELECT category, COUNT(*) as count FROM sample_valuations WHERE run_id = ? GROUP BY category",
+            (run['id'],)
+        ) as cursor:
+            cats = {row['category']: row['count'] for row in await cursor.fetchall()}
+            run['category_counts'] = cats
+            run['total_samples'] = sum(cats.values())
+    
+    return runs
+
 
 async def create_experiment(db_path: Path, data: dict):
     db = await get_db(db_path)

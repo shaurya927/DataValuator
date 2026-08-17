@@ -3,13 +3,59 @@ from typing import List, Optional
 from fastapi.responses import Response
 import csv
 import io
+import logging
+
+logger = logging.getLogger(__name__)
 
 from app.config import Settings, get_settings
-from app.database import get_valuation_summary, get_valuations, get_all_valuations, get_refined_valuations, get_valuation_by_index, get_valuation_count
-from app.models.valuation import ValuationSummary, SampleListResponse, SampleValuation, DistributionData, EmbeddingPoint
+from app.database import get_valuation_summary, get_valuations, get_all_valuations, get_refined_valuations, get_valuation_by_index, get_valuation_count, update_valuation_scores, batch_update_category, get_valuation_comparison, get_all_run_summaries
+from app.models.valuation import ValuationSummary, SampleListResponse, SampleValuation, DistributionData, EmbeddingPoint, WeightConfig, BatchUpdateRequest
 import numpy as np
 
 router = APIRouter(prefix="/api/valuation", tags=["valuation"])
+
+@router.get("/compare")
+async def compare_runs(run_a: str = Query(...), run_b: str = Query(...), settings: Settings = Depends(get_settings)):
+    """Compare valuations between two runs."""
+    comparison = await get_valuation_comparison(settings.DB_PATH, run_a, run_b)
+    if not comparison:
+        raise HTTPException(status_code=404, detail="No overlapping samples found")
+    
+    # Compute summaries
+    summary_a = await get_valuation_summary(settings.DB_PATH, run_a)
+    summary_b = await get_valuation_summary(settings.DB_PATH, run_b)
+    
+    counts_a = {r['category']: r['count'] for r in summary_a}
+    counts_b = {r['category']: r['count'] for r in summary_b}
+    
+    # Category changes
+    changes = []
+    overlap = 0
+    for row in comparison:
+        if row['cat_a'] != row['cat_b']:
+            changes.append({
+                'sample_index': row['sample_index'],
+                'from_category': row['cat_a'],
+                'to_category': row['cat_b'],
+                'score_a': row['score_a'],
+                'score_b': row['score_b']
+            })
+        else:
+            overlap += 1
+    
+    return {
+        "run_a_summary": {"category_counts": counts_a, "total": sum(counts_a.values())},
+        "run_b_summary": {"category_counts": counts_b, "total": sum(counts_b.values())},
+        "category_changes": changes[:500],  # Limit to 500 for API response size
+        "total_changes": len(changes),
+        "overlap_count": overlap,
+        "total_samples": len(comparison)
+    }
+
+@router.get("/all-summaries")
+async def all_summaries(settings: Settings = Depends(get_settings)):
+    """Get summaries for all completed runs."""
+    return await get_all_run_summaries(settings.DB_PATH)
 
 CSV_COLUMNS = [
     'sample_index', 'true_label', 'pred_label', 'unified_score',
@@ -184,7 +230,7 @@ async def export_refined_dataset(
                 try:
                     os.remove(path)
                 except Exception as e:
-                    print(f"Failed to cleanup {path}: {e}")
+                    logger.warning(f"Failed to cleanup {path}: {e}")
 
             return FileResponse(
                 temp_zip_path,
@@ -204,4 +250,45 @@ async def export_refined_dataset(
             media_type="text/csv",
             headers={"Content-Disposition": f"attachment; filename=refined_valuations_{run_id[:8]}.csv"},
         )
+
+@router.post("/{run_id}/recompute")
+async def recompute_scores(run_id: str, weights: WeightConfig, settings: Settings = Depends(get_settings)):
+    """Recompute unified scores with custom weights."""
+    from app.engine.valuator import compute_unified_scores
+    vals = await get_all_valuations(settings.DB_PATH, run_id)
+    if not vals:
+        raise HTTPException(status_code=404, detail="No valuations found")
+    
+    forgetting = np.array([v['forgetting_count'] for v in vals])
+    avg_loss = np.array([v['avg_loss'] for v in vals])
+    aum = np.array([v['aum_score'] for v in vals])
+    tracin = np.array([v['tracin_score'] for v in vals])
+    rarity = np.array([v['rarity_score'] for v in vals])
+    
+    w = [weights.forgetting, weights.loss, weights.aum, weights.tracin, weights.rarity]
+    scores, categories = compute_unified_scores(forgetting, avg_loss, aum, tracin, rarity, weights=w)
+    
+    updates = [(float(scores[i]), categories[i], vals[i]['sample_index']) for i in range(len(vals))]
+    await update_valuation_scores(settings.DB_PATH, run_id, updates)
+    
+    # Return new summary
+    from collections import Counter
+    counts = Counter(categories)
+    total = len(categories)
+    removal = counts.get('harmful', 0) + counts.get('redundant', 0)
+    return {
+        "total_samples": total,
+        "category_counts": dict(counts),
+        "recommended_removal_percentage": round((removal / total * 100) if total > 0 else 0, 1),
+        "weights_applied": w
+    }
+
+@router.post("/{run_id}/batch-update")
+async def batch_update(run_id: str, req: BatchUpdateRequest, settings: Settings = Depends(get_settings)):
+    """Batch update category for specified samples."""
+    valid_categories = {'high_value', 'normal', 'redundant', 'harmful', 'suspicious'}
+    if req.category not in valid_categories:
+        raise HTTPException(status_code=400, detail=f"Invalid category. Must be one of: {valid_categories}")
+    await batch_update_category(settings.DB_PATH, run_id, req.sample_indices, req.category)
+    return {"updated": len(req.sample_indices), "category": req.category}
 

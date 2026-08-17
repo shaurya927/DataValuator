@@ -3,6 +3,9 @@ from typing import List, Optional
 from pathlib import Path
 from datetime import datetime
 import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 import shutil
 
 from app.config import Settings, get_settings
@@ -74,7 +77,7 @@ async def upload_dataset(
             if target_column and target_column in df.columns:
                 num_classes = df[target_column].nunique()
     except Exception as e:
-        print(f"Failed to compute dataset stats: {e}")
+        logger.warning(f"Failed to compute dataset stats: {e}")
         
     data = {
         'id': dataset_id,
@@ -129,7 +132,7 @@ async def delete_dataset_route(dataset_id: str, settings: Settings = Depends(get
                 else:
                     os.remove(path)
         except Exception as e:
-            print(f"Failed to delete files for dataset {dataset_id}: {e}")
+            logger.warning(f"Failed to delete files for dataset {dataset_id}: {e}")
             
         extract_dir = settings.UPLOAD_DIR / dataset_id
         try:

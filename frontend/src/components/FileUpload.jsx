@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { api } from '../api/client';
 import { FolderIcon, ZapIcon, TargetIcon, BrainIcon, RocketIcon } from './Icons';
+import { useToast } from './Toast';
 
 export default function FileUpload({ onUploadSuccess }) {
   const [isDragging, setIsDragging] = useState(false);
@@ -8,6 +9,7 @@ export default function FileUpload({ onUploadSuccess }) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const fileInputRef = useRef(null);
+  const { addToast } = useToast();
 
   // Wizard state
   const [step, setStep] = useState(1);
@@ -80,9 +82,10 @@ export default function FileUpload({ onUploadSuccess }) {
         setStep(1);
         setProgress(0);
         if (onUploadSuccess) onUploadSuccess(res.id);
+        addToast('Dataset uploaded successfully!', 'success');
       }, 500);
     } catch (err) {
-      console.error(err);
+      addToast('Upload failed: ' + (err.message || 'Unknown error'), 'error');
       clearInterval(interval);
       setUploading(false);
     }
@@ -93,9 +96,11 @@ export default function FileUpload({ onUploadSuccess }) {
     try {
       const res = await api.downloadCifar10();
       setUploading(false);
+      addToast('CIFAR-10 downloaded!', 'success');
       if (onUploadSuccess) onUploadSuccess(res.id);
     } catch (err) {
       setUploading(false);
+      addToast('Failed to download CIFAR-10', 'error');
     }
   };
 

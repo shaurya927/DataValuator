@@ -2,8 +2,11 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import ScatterPlot from '../components/ScatterPlot';
 import SampleTable from '../components/SampleTable';
 import SampleCard from '../components/SampleCard';
+import WeightSliders from '../components/WeightSliders';
+import BatchToolbar from '../components/BatchToolbar';
 import { CursorClickIcon } from '../components/Icons';
 import { api } from '../api/client';
+import { useToast } from '../components/Toast';
 
 export default function Explorer() {
   const [runs, setRuns] = useState([]);
@@ -12,6 +15,9 @@ export default function Explorer() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedSample, setSelectedSample] = useState(null);
+  const [selectedIndices, setSelectedIndices] = useState(new Set());
+  const [weightsLoading, setWeightsLoading] = useState(false);
+  const { addToast } = useToast();
   
   const [filters, setFilters] = useState({
     high_value: true,
@@ -30,7 +36,7 @@ export default function Explorer() {
       if (completedRuns.length > 0) {
         setSelectedRun(completedRuns[0]);
       }
-    });
+    }).catch(() => addToast('Failed to load training runs', 'error'));
   }, []);
 
   // Fetch valuations when run changes
@@ -40,7 +46,7 @@ export default function Explorer() {
       setSelectedSample(null);
       api.getValuationSamples(selectedRun.id, { per_page: 2000 })
         .then(res => setData(res.samples || []))
-        .catch(console.error)
+        .catch(() => addToast('Failed to load valuation data', 'error'))
         .finally(() => setLoading(false));
     }
   }, [selectedRun]);
@@ -62,15 +68,59 @@ export default function Explorer() {
         type: 'prune',
         exclude_categories: ['harmful', 'redundant']
       });
-      alert('Pruning experiment started! Check the backend logs or experiments page.');
+      addToast('Pruning experiment started! Check the Experiments page.', 'success');
     } catch (e) {
-      alert('Failed to start experiment: ' + e.message);
+      addToast('Failed to start experiment: ' + e.message, 'error');
     }
   };
 
   const handleExport = () => {
     if (selectedRun) {
       api.exportRefinedDataset(selectedRun.id);
+    }
+  };
+
+  const handleApplyWeights = async (weights) => {
+    if (!selectedRun) return;
+    setWeightsLoading(true);
+    try {
+      await api.recomputeScores(selectedRun.id, weights);
+      addToast('Scores recomputed successfully', 'success');
+      // Re-fetch data
+      const res = await api.getValuationSamples(selectedRun.id, { per_page: 2000 });
+      setData(res.samples || []);
+    } catch (e) {
+      addToast('Failed to recompute scores: ' + e.message, 'error');
+    } finally {
+      setWeightsLoading(false);
+    }
+  };
+
+  const handleBatchExport = () => {
+    const toExport = data.filter(d => selectedIndices.has(d.sample_index ?? d.index));
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + "sample_index,category,unified_score\n"
+      + toExport.map(e => `${e.sample_index ?? e.index},${e.category},${e.unified_score}`).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "batch_export.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleBatchUpdateCategory = async (category) => {
+    if (!selectedRun) return;
+    try {
+      await api.batchUpdateCategory(selectedRun.id, [...selectedIndices], category);
+      addToast(`Marked ${selectedIndices.size} samples as ${category}`, 'success');
+      // Re-fetch data
+      const res = await api.getValuationSamples(selectedRun.id, { per_page: 2000 });
+      setData(res.samples || []);
+      setSelectedIndices(new Set());
+    } catch (e) {
+      addToast('Failed to update categories: ' + e.message, 'error');
     }
   };
 
@@ -104,6 +154,8 @@ export default function Explorer() {
           </button>
         </div>
       </div>
+
+      <WeightSliders onApply={handleApplyWeights} loading={weightsLoading} />
 
       {/* Filters Bar */}
       <div className="glass-panel p-4 mb-4 flex gap-4 items-center">
@@ -148,10 +200,24 @@ export default function Explorer() {
         {/* Bottom Area: Table */}
         <div className="h-1/3 min-h-[250px] overflow-hidden rounded-xl border border-glass shrink-0">
           <div className="h-full overflow-y-auto custom-scrollbar bg-glass">
-            <SampleTable samples={filteredData.slice(0, 100)} onRowClick={setSelectedSample} />
+            <SampleTable 
+              samples={filteredData.slice(0, 100)} 
+              onRowClick={setSelectedSample} 
+              selectable={true}
+              selectedIndices={selectedIndices}
+              onSelectionChange={setSelectedIndices}
+            />
           </div>
         </div>
       </div>
+      
+      <BatchToolbar 
+        visible={selectedIndices.size > 0} 
+        selectedCount={selectedIndices.size}
+        onExport={handleBatchExport}
+        onMarkCategory={handleBatchUpdateCategory}
+        onDeselectAll={() => setSelectedIndices(new Set())}
+      />
     </div>
   );
 }

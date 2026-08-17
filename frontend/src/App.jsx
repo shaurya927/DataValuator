@@ -8,6 +8,7 @@ import Training from './pages/Training';
 import Explorer from './pages/Explorer';
 import Experiments from './pages/Experiments';
 import NotFound from './pages/NotFound';
+import Compare from './pages/Compare';
 import { ToastProvider } from './components/Toast';
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
         <Route path="/training" element={<Layout><Training /></Layout>} />
         <Route path="/explorer" element={<Layout><Explorer /></Layout>} />
         <Route path="/experiments" element={<Layout><Experiments /></Layout>} />
+        <Route path="/compare" element={<Layout><Compare /></Layout>} />
         
         {/* Catch-all 404 */}
         <Route path="*" element={<Layout><NotFound /></Layout>} />

@@ -28,9 +28,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedRunId, setSelectedRunId] = useState('');
   const [completedRuns, setCompletedRuns] = useState([]);
+  const [runSummaries, setRunSummaries] = useState([]);
 
   useEffect(() => {
     loadHistory();
+    api.getAllRunSummaries().then(data => setRunSummaries(Array.isArray(data) ? data : [])).catch(console.error);
   }, []);
 
   async function loadHistory() {
@@ -247,6 +249,52 @@ export default function Dashboard() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          <h3 className="text-lg font-semibold mb-4 mt-8">Model Comparison</h3>
+          <div className="table-container" style={{ flex: 1, marginBottom: 'var(--space-6)' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Model</th>
+                  <th>Accuracy</th>
+                  <th>Epochs</th>
+                  <th>LR</th>
+                  <th>Total Samples</th>
+                  <th>High Value %</th>
+                  <th>Harmful %</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...runSummaries].sort((a, b) => (b.val_accuracy || 0) - (a.val_accuracy || 0)).map(run => (
+                  <tr key={run.id || run.run_id} onClick={() => setSelectedRunId(run.id || run.run_id)} style={{ cursor: 'pointer' }} className={selectedRunId === (run.id || run.run_id) ? 'bg-white/5' : ''}>
+                    <td>{run.model_name || '—'}</td>
+                    <td className="font-mono font-medium">{run.val_accuracy ? `${(run.val_accuracy * 100).toFixed(1)}%` : '—'}</td>
+                    <td>{run.hyperparameters?.epochs || '—'}</td>
+                    <td>{run.hyperparameters?.learning_rate || '—'}</td>
+                    <td>{run.total_samples || '—'}</td>
+                    <td>{run.category_counts?.high_value ? `${((run.category_counts.high_value / run.total_samples) * 100).toFixed(1)}%` : '—'}</td>
+                    <td>{run.category_counts?.harmful ? `${((run.category_counts.harmful / run.total_samples) * 100).toFixed(1)}%` : '—'}</td>
+                    <td className="text-muted text-sm">{run.started_at ? new Date(run.started_at).toLocaleDateString() : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+             {[...runSummaries].sort((a, b) => (b.val_accuracy || 0) - (a.val_accuracy || 0)).map(run => {
+               const width = run.val_accuracy ? `${run.val_accuracy * 100}%` : '0%';
+               return (
+                 <div key={`chart-${run.id || run.run_id}`} className="flex items-center gap-4">
+                   <div className="w-32 text-right text-sm truncate" title={run.model_name}>{run.model_name || run.id}</div>
+                   <div className="flex-1 bg-dark/50 rounded-full h-4 overflow-hidden">
+                     <div className="h-full bg-accent-blue" style={{ width }} />
+                   </div>
+                   <div className="w-16 text-sm font-mono">{run.val_accuracy ? `${(run.val_accuracy * 100).toFixed(1)}%` : '—'}</div>
+                 </div>
+               );
+             })}
           </div>
         </div>
       </div>

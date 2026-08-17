@@ -5,9 +5,12 @@ import uuid
 import os
 import json
 import traceback
+import logging
 import numpy as np
 from datetime import datetime
 from typing import Optional, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 from app.config import get_settings
 from app.database import (
@@ -170,6 +173,19 @@ class JobManager:
             await ws_manager.broadcast({
                 "run_id": run_id, "status": "failed", "message": error_msg,
             })
+            # Clean up partial artifacts from failed run
+            import shutil
+            _ckpt_dir = locals().get('checkpoint_dir')
+            _metrics_file = locals().get('metrics_path')
+            if _ckpt_dir and os.path.isdir(_ckpt_dir):
+                logger.info(f"Cleaning up checkpoint dir for failed run {run_id}")
+                shutil.rmtree(_ckpt_dir, ignore_errors=True)
+            if _metrics_file and os.path.isfile(_metrics_file):
+                logger.info(f"Cleaning up metrics file for failed run {run_id}")
+                try:
+                    os.remove(_metrics_file)
+                except OSError:
+                    pass
         finally:
             if self.current_job and self.current_job.get("id") == run_id:
                 self.current_job = None

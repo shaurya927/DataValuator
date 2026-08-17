@@ -5,6 +5,7 @@ forgetting events, loss trajectories, and AUM (Area Under Margin) scores.
 Checkpoints are saved at configurable intervals for post-training TracIn.
 """
 import os
+import logging
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -15,6 +16,8 @@ import torch.nn.functional as F
 
 from .trackers import ForgettingTracker, LossAUMTracker
 from .storage import MetricStore
+
+logger = logging.getLogger(__name__)
 
 
 class DataValuatorTrainer:
@@ -104,7 +107,7 @@ class DataValuatorTrainer:
 
         for epoch in range(self.max_epochs):
             if self.cancel_event and self.cancel_event.is_set():
-                print("Training cancelled via event.")
+                logger.info("Training cancelled via event.")
                 break
 
             # ---- Training pass ---- #

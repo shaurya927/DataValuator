@@ -3,11 +3,13 @@ import FileUpload from '../components/FileUpload';
 import { api } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { FolderIcon, FileTextIcon } from '../components/Icons';
+import { useToast } from '../components/Toast';
 
 export default function Datasets() {
   const [datasets, setDatasets] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { addToast } = useToast();
 
   const fetchDatasets = async () => {
     setLoading(true);
@@ -15,7 +17,7 @@ export default function Datasets() {
       const data = await api.listDatasets();
       setDatasets(data);
     } catch (e) {
-      console.error(e);
+      addToast('Failed to load datasets', 'error');
     }
     setLoading(false);
   };
@@ -30,8 +32,13 @@ export default function Datasets() {
 
   const handleDelete = async (id) => {
     if (window.confirm('Delete this dataset?')) {
-      await api.deleteDataset(id);
-      fetchDatasets();
+      try {
+        await api.deleteDataset(id);
+        addToast('Dataset deleted', 'success');
+        fetchDatasets();
+      } catch (e) {
+        addToast('Failed to delete dataset', 'error');
+      }
     }
   };
 

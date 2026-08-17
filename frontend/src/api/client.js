@@ -6,11 +6,14 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-const BASE_URL = '/api';
+const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 async function request(path, options = {}) {
+  const apiKey = localStorage.getItem('dataValuator_apiKey');
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers,
     cache: 'no-store',
     ...options,
   });
@@ -112,6 +115,24 @@ export const api = {
   getExperimentResults: (id) => request(`/experiments/${id}/results`),
 
   getExperimentHistory: () => request('/experiments/history'),
+
+  // ---- Advanced Valuation ---- //
+  recomputeScores: (runId, weights) =>
+    request(`/valuation/${runId}/recompute`, {
+      method: 'POST',
+      body: JSON.stringify(weights),
+    }),
+
+  batchUpdateCategory: (runId, sampleIndices, category) =>
+    request(`/valuation/${runId}/batch-update`, {
+      method: 'POST',
+      body: JSON.stringify({ sample_indices: sampleIndices, category }),
+    }),
+
+  compareRuns: (runIdA, runIdB) =>
+    request(`/valuation/compare?run_a=${runIdA}&run_b=${runIdB}`),
+
+  getAllRunSummaries: () => request('/valuation/all-summaries'),
 };
 
 
@@ -135,8 +156,10 @@ export function useTrainingSocket(onMessage) {
   }, [onMessage]);
 
   const connect = useCallback(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/training`;
+    const wsBase = import.meta.env.VITE_WS_URL;
+    const wsUrl = wsBase
+      ? `${wsBase}/ws/training`
+      : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/training`;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

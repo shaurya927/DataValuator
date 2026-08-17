@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { DashboardIcon, DatabaseIcon, ZapIcon, SearchIcon, FlaskIcon, ChevronLeftIcon, ChevronRightIcon } from './Icons';
+import { NavLink, useLocation, Link } from 'react-router-dom';
+import { DashboardIcon, DatabaseIcon, ZapIcon, SearchIcon, FlaskIcon, ChevronLeftIcon, ChevronRightIcon, LayersIcon } from './Icons';
 
 const navItems = [
   { path: '/dashboard', icon: <DashboardIcon size={18} />, label: 'Dashboard' },
@@ -8,6 +8,7 @@ const navItems = [
   { path: '/training', icon: <ZapIcon size={18} />, label: 'Training' },
   { path: '/explorer', icon: <SearchIcon size={18} />, label: 'Explorer' },
   { path: '/experiments', icon: <FlaskIcon size={18} />, label: 'Experiments' },
+  { path: '/compare', icon: <LayersIcon size={18} />, label: 'Compare' },
 ];
 
 export default function Layout({ children }) {
@@ -29,7 +30,7 @@ export default function Layout({ children }) {
       >
         {/* Logo bar */}
         <div style={styles.sidebarHeader}>
-          {!collapsed && <span style={styles.logo}>DataValuator</span>}
+          {!collapsed && <Link to="/" style={styles.logo}>DataValuator</Link>}
           <button
             onClick={() => setCollapsed(!collapsed)}
             style={styles.collapseBtn}
@@ -115,6 +116,7 @@ const styles = {
     color: 'var(--text-primary)',
     letterSpacing: '0.02em',
     whiteSpace: 'nowrap',
+    textDecoration: 'none',
   },
   collapseBtn: {
     background: 'none',

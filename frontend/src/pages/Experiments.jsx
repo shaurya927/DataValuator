@@ -3,6 +3,7 @@ import ComparisonChart from '../components/ComparisonChart';
 import MetricCard from '../components/MetricCard';
 import { api } from '../api/client';
 import { ScissorsIcon, TagIcon, BarChartIcon, RocketIcon, ClockIcon, DownloadIcon } from '../components/Icons';
+import { useToast } from '../components/Toast';
 
 export default function Experiments() {
   const [runs, setRuns] = useState([]);
@@ -17,6 +18,7 @@ export default function Experiments() {
   
   const [currentResult, setCurrentResult] = useState(null);
   const [chartData, setChartData] = useState([]);
+  const { addToast } = useToast();
 
   useEffect(() => {
     loadInitialData();
@@ -47,6 +49,11 @@ export default function Experiments() {
       if (result.status === 'completed' || result.status === 'failed') {
         setCurrentResult(result);
         setStatus('idle');
+        if (result.status === 'completed') {
+          addToast('Experiment completed!', 'success');
+        } else {
+          addToast('Experiment failed', 'error');
+        }
         
         const historyData = await api.getExperimentHistory();
         setHistory(historyData || []);
@@ -83,6 +90,7 @@ export default function Experiments() {
     } catch (err) {
       setErrorMsg(err.message);
       setStatus('error');
+      addToast('Failed to start pruning experiment', 'error');
     }
   };
 
@@ -97,6 +105,7 @@ export default function Experiments() {
     } catch (err) {
       setErrorMsg(err.message);
       setStatus('error');
+      addToast('Failed to start noise experiment', 'error');
     }
   };
 

@@ -3,6 +3,7 @@ import ProgressBar from '../components/ProgressBar';
 import { api, useTrainingSocket } from '../api/client';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { RocketIcon, StopIcon } from '../components/Icons';
+import { useToast } from '../components/Toast';
 
 export default function Training() {
   const [status, setStatus] = useState('idle'); // idle, training, completed
@@ -13,6 +14,7 @@ export default function Training() {
   const [history, setHistory] = useState([]);
   const [progress, setProgress] = useState(0);
   const [metrics, setMetrics] = useState({ loss: null, acc: null, epoch: 0 });
+  const { addToast } = useToast();
 
   // Load datasets and check running status on mount
   React.useEffect(() => {
@@ -21,7 +23,7 @@ export default function Training() {
       if (ds?.length > 0 && !config.dataset_id) {
         setConfig(prev => ({ ...prev, dataset_id: ds[0].id }));
       }
-    }).catch(() => {});
+    }).catch(() => addToast('Failed to load datasets', 'error'));
 
     api.getTrainingStatus().then(async (statusRes) => {
       if (statusRes && statusRes.status === 'running') {
@@ -61,8 +63,10 @@ export default function Training() {
     } else if (msg.status === 'completed') {
       setStatus('completed');
       setProgress(100);
+      addToast('Training completed successfully!', 'success');
     } else if (msg.status === 'failed') {
       setStatus('idle');
+      addToast('Training failed', 'error');
     }
   });
 
@@ -75,6 +79,7 @@ export default function Training() {
       setRunId(res.run_id || res.runId);
     } catch (e) {
       setStatus('idle');
+      addToast('Failed to start training: ' + (e.message || 'Unknown error'), 'error');
     }
   };
 
