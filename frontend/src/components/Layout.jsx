@@ -69,10 +69,7 @@ export default function Layout({ children }) {
 
       {/* ───── Main area ───── */}
       <main style={styles.main}>
-        {/* Top bar */}
-        <header style={styles.topBar}>
-          <h1 style={styles.pageTitle}>{pageTitle}</h1>
-        </header>
+
 
         {/* Content */}
         <div style={styles.content}>
@@ -91,12 +88,13 @@ const styles = {
     display: 'flex',
     height: '100vh',
     overflow: 'hidden',
+    backgroundColor: 'var(--bg-base)',
   },
   sidebar: {
     display: 'flex',
     flexDirection: 'column',
-    background: 'linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-base) 100%)',
-    borderRight: '1px solid var(--border-glass)',
+    background: 'transparent',
+    borderRight: 'none',
     transition: 'width var(--transition-slow)',
     overflow: 'hidden',
     flexShrink: 0,
@@ -106,7 +104,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 'var(--space-4)',
-    borderBottom: '1px solid var(--border-glass)',
+    borderBottom: 'none',
     height: 64,
     minHeight: 64,
   },
@@ -166,7 +164,7 @@ const styles = {
   },
   sidebarFooter: {
     padding: 'var(--space-4)',
-    borderTop: '1px solid var(--border-glass)',
+    borderTop: 'none',
     fontSize: 'var(--font-xs)',
     color: 'var(--text-muted)',
   },
@@ -176,7 +174,7 @@ const styles = {
     flexDirection: 'column',
     minWidth: 0,
     overflow: 'hidden',
-    backgroundColor: 'var(--bg-base)',
+    backgroundColor: 'transparent',
   },
   topBar: {
     height: 64,

@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import FileUpload from '../components/FileUpload';
 import { api } from '../api/client';
 import { useNavigate } from 'react-router-dom';
-import { FolderIcon, FileTextIcon } from '../components/Icons';
+import { FolderIcon, FileTextIcon, PlusIcon } from '../components/Icons';
 import { useToast } from '../components/Toast';
 
 export default function Datasets() {
   const [datasets, setDatasets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showUpload, setShowUpload] = useState(false);
   const navigate = useNavigate();
   const { addToast } = useToast();
 
@@ -27,6 +28,7 @@ export default function Datasets() {
   }, []);
 
   const handleUploadSuccess = () => {
+    setShowUpload(false);
     fetchDatasets();
   };
 
@@ -44,17 +46,29 @@ export default function Datasets() {
 
   return (
     <div className="space-y-6">
-      <FileUpload onUploadSuccess={handleUploadSuccess} />
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Available Datasets</h2>
+        {datasets.length > 0 && !loading && (
+          <button 
+            onClick={() => setShowUpload(!showUpload)}
+            className="btn btn-primary py-1.5 px-4 text-sm font-medium flex items-center gap-2"
+          >
+            {showUpload ? 'Cancel' : <><PlusIcon size={16} /> Add Dataset</>}
+          </button>
+        )}
+      </div>
+
+      {(showUpload || (datasets.length === 0 && !loading)) && (
+        <FileUpload onUploadSuccess={handleUploadSuccess} />
+      )}
 
       <div>
-        <h2 className="text-xl font-semibold mb-4">Available Datasets</h2>
-        
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1,2,3].map(i => <div key={i} className="h-40 skeleton" />)}
           </div>
         ) : datasets.length === 0 ? (
-          <div className="glass-panel p-12 text-center flex flex-col items-center">
+          <div className="glass-panel p-12 text-center flex flex-col items-center mt-4">
             <div className="text-6xl mb-4 opacity-50"><FolderIcon size={48} /></div>
             <h3 className="text-lg font-medium text-secondary">No datasets found</h3>
             <p className="text-muted mt-2">Upload a dataset above to get started.</p>

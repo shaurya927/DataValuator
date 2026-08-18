@@ -33,6 +33,8 @@ export default function Explorer() {
     api.getTrainingHistory().then(res => {
       // Filter for completed runs that have valuations
       const completedRuns = res.filter(r => r.status === 'completed');
+      // Sort by newest first so the latest run is selected by default
+      completedRuns.sort((a, b) => new Date(b.started_at) - new Date(a.started_at));
       setRuns(completedRuns);
       if (completedRuns.length > 0) {
         setSelectedRun(completedRuns[0]);

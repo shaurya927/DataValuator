@@ -1,7 +1,13 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import Plot from 'react-plotly.js';
 
 export default React.memo(function ScatterPlot({ data, onPointClick }) {
+  // Track revision to force Plotly to redraw and rebind events when data updates
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    setRevision(r => r + 1);
+  }, [data]);
+
   // Map categories to design system colors
   const colorMap = {
     high_value: '#34d399',
@@ -77,8 +83,8 @@ export default React.memo(function ScatterPlot({ data, onPointClick }) {
     <div className="glass-panel w-full overflow-hidden" style={{ height: '100%', minHeight: '400px' }}>
       <Plot
         data={traces}
-        layout={{ ...layout, datarevision: data.length }}
-        revision={data.length}
+        layout={{ ...layout, datarevision: revision }}
+        revision={revision}
         config={{ displayModeBar: true, responsive: true }}
         onClick={handleClick}
         style={{ width: '100%', height: '100%' }}
