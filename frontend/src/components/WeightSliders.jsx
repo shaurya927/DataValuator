@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 const METRICS = [
   { key: 'forgetting', label: 'Forgetting', tooltip: 'Impact of catastrophic forgetting', color: '#fbbf24' },
   { key: 'loss', label: 'Loss', tooltip: 'Average loss contribution', color: '#fb7185' },
-  { key: 'aum', label: 'AUM', tooltip: 'Area under the margin', color: '#2dd4bf' },
+  { key: 'aum', label: 'AUM', tooltip: 'Area under the margin', color: '#007BFF' },
   { key: 'tracin', label: 'TracIn', tooltip: 'Gradient-based influence', color: '#34d399' },
   { key: 'rarity', label: 'Rarity', tooltip: 'Data rarity score', color: '#a78bfa' }
 ];

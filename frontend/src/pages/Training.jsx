@@ -195,7 +195,7 @@ export default function Training() {
                   <YAxis yAxisId="left" stroke="#a0a0a0" fontSize={12} tickLine={false} domain={[0, 'auto']} />
                   <YAxis yAxisId="right" orientation="right" stroke="#34d399" fontSize={12} tickLine={false} domain={[0, 1]} />
                   <Tooltip contentStyle={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-glass)' }} />
-                  <Line yAxisId="left" type="monotone" dataKey="loss" stroke="#2dd4bf" strokeWidth={2} dot={false} isAnimationActive={false} />
+                  <Line yAxisId="left" type="monotone" dataKey="loss" stroke="#007BFF" strokeWidth={2} dot={false} isAnimationActive={false} />
                   <Line yAxisId="right" type="monotone" dataKey="accuracy" stroke="#34d399" strokeWidth={2} dot={false} isAnimationActive={false} />
                 </LineChart>
               </ResponsiveContainer>

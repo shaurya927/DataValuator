@@ -48,7 +48,7 @@ const typeStyles = {
   success: { color: '#10b981', glow: 'rgba(16, 185, 129, 0.2)', icon: <SuccessIcon /> },
   error: { color: '#f43f5e', glow: 'rgba(244, 63, 94, 0.2)', icon: <ErrorIcon /> },
   warning: { color: '#f59e0b', glow: 'rgba(245, 158, 11, 0.2)', icon: <WarningIcon /> },
-  info: { color: '#2dd4bf', glow: 'rgba(45, 212, 191, 0.2)', icon: <InfoIcon /> }
+  info: { color: '#007BFF', glow: 'rgba(0, 123, 255, 0.2)', icon: <InfoIcon /> }
 };
 
 const Toast = ({ id, message, type, onClose }) => {

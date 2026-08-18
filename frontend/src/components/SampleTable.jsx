@@ -14,7 +14,7 @@ export default function SampleTable({ samples, onRowClick, selectable = false, s
   const getScoreColor = (score) => {
     // Heatmap style logic based on score 0-1
     if (score > 0.8) return 'rgba(52, 211, 153, 0.2)'; // green
-    if (score > 0.5) return 'rgba(45, 212, 191, 0.2)'; // blue
+    if (score > 0.5) return 'rgba(0, 123, 255, 0.2)'; // blue
     if (score > 0.3) return 'rgba(251, 191, 36, 0.2)'; // amber
     return 'rgba(251, 113, 133, 0.2)'; // red
   };

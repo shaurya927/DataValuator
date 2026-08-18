@@ -7,7 +7,7 @@ import { BarChartIcon, FolderIcon, ZapIcon, SearchIcon, RefreshIcon, AlertCircle
 
 const CATEGORY_COLORS = {
   high_value: '#34d399',
-  normal: '#2dd4bf',
+  normal: '#007BFF',
   redundant: '#fbbf24',
   harmful: '#fb7185',
   suspicious: '#a78bfa',

@@ -5,7 +5,7 @@ export default React.memo(function ScatterPlot({ data, onPointClick }) {
   // Map categories to design system colors
   const colorMap = {
     high_value: '#34d399',
-    normal: '#2dd4bf',
+    normal: '#007BFF',
     redundant: '#fbbf24',
     harmful: '#fb7185',
     suspicious: '#a78bfa'

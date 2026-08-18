@@ -67,7 +67,7 @@ const LandingPage = () => {
       right: 0,
       height: '100vh',
       pointerEvents: 'none',
-      background: 'radial-gradient(circle at 50% 30%, rgba(45, 212, 191, 0.05) 0%, transparent 60%)',
+      background: 'radial-gradient(circle at 50% 30%, rgba(0, 123, 255, 0.05) 0%, transparent 60%)',
       zIndex: 0,
     },
     nav: {
@@ -148,7 +148,8 @@ const LandingPage = () => {
       marginBottom: '24px',
     },
     title: {
-      fontSize: '64px',
+      fontSize: 'clamp(32px, 5vw, 56px)',
+      whiteSpace: 'nowrap',
       fontWeight: '600',
       lineHeight: '1.1',
       marginBottom: '32px',
@@ -166,8 +167,49 @@ const LandingPage = () => {
       fontSize: '18px',
       color: 'var(--text-secondary)',
       lineHeight: '1.6',
-      maxWidth: '600px',
+      maxWidth: '550px',
+      margin: '0 auto 32px auto',
+    },
+    ctaContainer: {
+      display: 'flex',
+      gap: '16px',
+      justifyContent: 'center',
       marginBottom: '48px',
+    },
+    primaryCTA: {
+      background: 'var(--accent-blue)',
+      color: '#ffffff',
+      padding: '12px 24px',
+      borderRadius: '8px',
+      fontSize: '15px',
+      fontWeight: '600',
+      textDecoration: 'none',
+      transition: 'opacity 0.2s ease',
+      display: 'inline-flex',
+      alignItems: 'center',
+    },
+    secondaryCTA: {
+      background: 'var(--bg-surface)',
+      border: '1px solid var(--border-glass)',
+      color: 'var(--text-primary)',
+      padding: '12px 24px',
+      borderRadius: '8px',
+      fontSize: '15px',
+      fontWeight: '600',
+      textDecoration: 'none',
+      transition: 'background 0.2s ease',
+      display: 'inline-flex',
+      alignItems: 'center',
+    },
+    trustLine: {
+      fontFamily: 'monospace',
+      fontSize: '12px',
+      color: 'var(--text-muted)',
+      background: 'var(--bg-surface-elevated)',
+      border: '1px solid var(--border-glass)',
+      padding: '6px 16px',
+      borderRadius: '4px',
+      display: 'inline-block',
     },
     cardSection: {
       width: '100%',
@@ -267,15 +309,20 @@ const LandingPage = () => {
 
       <main style={styles.main}>
         <div className="fade-in-element" style={styles.animStyle}>
-          <div style={styles.overline}>A QUIET PLACE FOR DATA</div>
-          <h1 style={styles.title}>DataValuator</h1>
-          <div style={styles.subtitle}>
-            For every broken model · No account · Runs locally
-          </div>
+          <div style={styles.overline}>TRAINING DATA INTELLIGENCE</div>
+          <h1 style={styles.title}>Know Which Data Actually Matters.</h1>
           <p style={styles.description}>
-            Somewhere out there another model just overfit. After 34 epochs, after 247, after a thousand and more. If it was yours: it can rest here, with dignity. Find the harmful samples, prune the redundant ones, and try again.
+            DataValuator analyzes your training dataset to identify harmful, redundant, rare, and high-value samples—so you can train better models with less data.
           </p>
 
+          <div style={styles.ctaContainer}>
+            <Link to="/dashboard" style={{...styles.primaryCTA, '&:hover': {opacity: 0.9}}} className="hover-opacity">Analyze Dataset</Link>
+            <a href="https://github.com/shaurya927/DataValuator" target="_blank" rel="noreferrer" style={styles.secondaryCTA} className="hover-bg-surface-elevated">View Documentation</a>
+          </div>
+
+          <div style={styles.trustLine}>
+            No account · Runs locally · Your data stays yours
+          </div>
         </div>
       </main>
 

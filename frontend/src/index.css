@@ -15,9 +15,9 @@
   --text-inverse: #0a0a0a;
 
   /* Accent Colors — Teal-forward palette */
-  --accent-blue: #2dd4bf;
+  --accent-blue: #007BFF;
   --accent-blue-hover: #14b8a6;
-  --accent-blue-alpha: rgba(45, 212, 191, 0.15);
+  --accent-blue-alpha: rgba(0, 123, 255, 0.15);
   --accent-emerald: #34d399;
   --accent-amber: #fbbf24;
   --accent-rose: #fb7185;
@@ -32,7 +32,7 @@
 
   /* Category Alphas (for backgrounds) */
   --cat-high-value-bg: rgba(52, 211, 153, 0.1);
-  --cat-normal-bg: rgba(45, 212, 191, 0.1);
+  --cat-normal-bg: rgba(0, 123, 255, 0.1);
   --cat-redundant-bg: rgba(251, 191, 36, 0.1);
   --cat-harmful-bg: rgba(251, 113, 133, 0.1);
   --cat-suspicious-bg: rgba(167, 139, 250, 0.1);
@@ -69,7 +69,7 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
-  --shadow-glow: 0 0 20px rgba(45, 212, 191, 0.08);
+  --shadow-glow: 0 0 20px rgba(0, 123, 255, 0.08);
 
   /* Transitions */
   --transition-fast: 0.15s ease;
@@ -91,12 +91,12 @@ body.light-mode {
   --text-muted: #94a3b8;
   --text-inverse: #ffffff;
 
-  --accent-blue-alpha: rgba(45, 212, 191, 0.1);
+  --accent-blue-alpha: rgba(0, 123, 255, 0.1);
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
-  --shadow-glow: 0 0 20px rgba(45, 212, 191, 0.2);
+  --shadow-glow: 0 0 20px rgba(0, 123, 255, 0.2);
 }
 
 /* Reset & Base */
@@ -209,7 +209,7 @@ ul {
 }
 .btn-primary:hover {
   background: var(--accent-blue-hover);
-  box-shadow: 0 0 16px rgba(45, 212, 191, 0.2);
+  box-shadow: 0 0 16px rgba(0, 123, 255, 0.2);
 }
 
 .btn-secondary {
@@ -308,7 +308,7 @@ select.input-field option:hover {
 }
 
 .badge-high_value { background: var(--cat-high-value-bg); color: var(--cat-high-value); border-color: rgba(52, 211, 153, 0.2); }
-.badge-normal { background: var(--cat-normal-bg); color: var(--cat-normal); border-color: rgba(45, 212, 191, 0.2); }
+.badge-normal { background: var(--cat-normal-bg); color: var(--cat-normal); border-color: rgba(0, 123, 255, 0.2); }
 .badge-redundant { background: var(--cat-redundant-bg); color: var(--cat-redundant); border-color: rgba(251, 191, 36, 0.2); }
 .badge-harmful { background: var(--cat-harmful-bg); color: var(--cat-harmful); border-color: rgba(251, 113, 133, 0.2); }
 .badge-suspicious { background: var(--cat-suspicious-bg); color: var(--cat-suspicious); border-color: rgba(167, 139, 250, 0.2); }

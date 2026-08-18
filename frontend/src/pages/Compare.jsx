@@ -4,7 +4,7 @@ import { BarChartIcon, ActivityIcon, SearchIcon, LayersIcon, RefreshIcon } from 
 
 const CATEGORY_COLORS = {
   high_value: 'var(--accent-emerald, #34d399)',
-  normal: 'var(--accent-blue, #2dd4bf)',
+  normal: 'var(--accent-blue, #007BFF)',
   redundant: 'var(--accent-amber, #fbbf24)',
   harmful: 'var(--accent-rose, #fb7185)',
   suspicious: 'var(--accent-violet, #a78bfa)',
