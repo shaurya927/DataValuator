@@ -40,6 +40,40 @@ export const api = {
     return res.json();
   },
 
+  analyzeDataset: async (id) => {
+    const res = await fetch(`${BASE_URL}/datasets/${id}/analyze`);
+    if (!res.ok) throw new Error('Failed to analyze dataset');
+    return res.json();
+  },
+
+  downloadPreprocessedDataset: async (id, options) => {
+    const res = await fetch(`${BASE_URL}/datasets/${id}/preprocess`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(options),
+    });
+    if (!res.ok) throw new Error('Failed to preprocess dataset');
+    
+    // Download the blob
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    
+    // Extract filename from content-disposition if possible
+    const disposition = res.headers.get('content-disposition');
+    let filename = `preprocessed_${id}.csv`;
+    if (disposition && disposition.indexOf('filename=') !== -1) {
+      filename = disposition.split('filename=')[1].replace(/"/g, '');
+    }
+    
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
+
   downloadCifar10: () =>
     request('/datasets/cifar10', { method: 'POST' }),
 

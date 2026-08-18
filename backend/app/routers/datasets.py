@@ -224,3 +224,132 @@ async def get_dataset_sample_data(dataset_id: str, sample_index: int, settings: 
             raise HTTPException(status_code=500, detail=str(e))
             
     return JSONResponse(content={"type": "unknown", "data": "No raw data preview available for this dataset type."})
+
+@router.get("/{dataset_id}/analyze")
+async def analyze_tabular_dataset(dataset_id: str, settings: Settings = Depends(get_settings)):
+    ds = await get_dataset(settings.DB_PATH, dataset_id)
+    if not ds:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+        
+    if ds.get("type") != "csv":
+        raise HTTPException(status_code=400, detail="Only tabular (CSV) datasets can be analyzed")
+        
+    ds_path = ds.get("path")
+    try:
+        import pandas as pd
+        import numpy as np
+        df = pd.read_csv(ds_path)
+        
+        columns_info = []
+        for col in df.columns:
+            dtype = str(df[col].dtype)
+            missing = int(df[col].isnull().sum())
+            unique = int(df[col].nunique())
+            col_type = "numerical" if pd.api.types.is_numeric_dtype(df[col]) else "categorical"
+            columns_info.append({
+                "name": col,
+                "type": col_type,
+                "dtype": dtype,
+                "missing": missing,
+                "unique": unique
+            })
+            
+        return {
+            "total_rows": len(df),
+            "total_columns": len(df.columns),
+            "total_missing": int(df.isnull().sum().sum()),
+            "columns": columns_info
+        }
+    except Exception as e:
+        logger.error(f"Analysis failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+from app.models.dataset import PreprocessOptions
+from fastapi.responses import StreamingResponse
+import io
+
+@router.post("/{dataset_id}/preprocess")
+async def preprocess_tabular_dataset(
+    dataset_id: str, 
+    options: PreprocessOptions,
+    settings: Settings = Depends(get_settings)
+):
+    ds = await get_dataset(settings.DB_PATH, dataset_id)
+    if not ds:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+        
+    if ds.get("type") != "csv":
+        raise HTTPException(status_code=400, detail="Only tabular datasets can be preprocessed")
+        
+    ds_path = ds.get("path")
+    try:
+        import pandas as pd
+        import numpy as np
+        from sklearn.impute import SimpleImputer
+        from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder
+        
+        df = pd.read_csv(ds_path)
+        
+        # 1. Drop columns
+        if options.drop_columns:
+            cols_to_drop = [c.strip() for c in options.drop_columns if c.strip() in df.columns]
+            df = df.drop(columns=cols_to_drop)
+            
+        # 2. Imputation
+        if options.imputation_strategy != "none":
+            if options.imputation_strategy == "drop":
+                df = df.dropna()
+            else:
+                num_cols = df.select_dtypes(include=np.number).columns
+                cat_cols = df.select_dtypes(exclude=np.number).columns
+                
+                if options.imputation_strategy in ["mean", "median", "most_frequent"]:
+                    if len(num_cols) > 0:
+                        strat = options.imputation_strategy if options.imputation_strategy in ["mean", "median"] else "mean"
+                        imp_num = SimpleImputer(strategy=strat)
+                        df[num_cols] = imp_num.fit_transform(df[num_cols])
+                    if len(cat_cols) > 0:
+                        imp_cat = SimpleImputer(strategy="most_frequent")
+                        df[cat_cols] = imp_cat.fit_transform(df[cat_cols])
+                        
+        # 3. Categorical Encoding
+        if options.categorical_encoding != "none":
+            cat_cols = df.select_dtypes(exclude=np.number).columns
+            if options.target_column and options.target_column in cat_cols:
+                # Always label encode target column if specified
+                le = LabelEncoder()
+                df[options.target_column] = le.fit_transform(df[options.target_column].astype(str))
+                cat_cols = [c for c in cat_cols if c != options.target_column]
+                
+            if len(cat_cols) > 0:
+                if options.categorical_encoding == "label":
+                    for c in cat_cols:
+                        le = LabelEncoder()
+                        df[c] = le.fit_transform(df[c].astype(str))
+                elif options.categorical_encoding == "onehot":
+                    df = pd.get_dummies(df, columns=cat_cols, drop_first=True)
+                    
+        # 4. Scaling
+        if options.scaling != "none":
+            num_cols = df.select_dtypes(include=np.number).columns
+            if options.target_column and options.target_column in num_cols:
+                num_cols = [c for c in num_cols if c != options.target_column]
+                
+            if len(num_cols) > 0:
+                if options.scaling == "standard":
+                    scaler = StandardScaler()
+                    df[num_cols] = scaler.fit_transform(df[num_cols])
+                elif options.scaling == "minmax":
+                    scaler = MinMaxScaler()
+                    df[num_cols] = scaler.fit_transform(df[num_cols])
+                    
+        # Return as CSV
+        stream = io.StringIO()
+        df.to_csv(stream, index=False)
+        response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
+        response.headers["Content-Disposition"] = f"attachment; filename=preprocessed_{ds.get('name', 'dataset')}"
+        return response
+        
+    except Exception as e:
+        logger.error(f"Preprocessing failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Preprocessing failed: {str(e)}")

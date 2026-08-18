@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ProgressBar from '../components/ProgressBar';
 import { api, useTrainingSocket } from '../api/client';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { RocketIcon, StopIcon } from '../components/Icons';
+import { RocketIcon, StopIcon, DatabaseIcon, ChevronLeftIcon, DownloadIcon } from '../components/Icons';
 import { useToast } from '../components/Toast';
 
 export default function Training() {
@@ -16,8 +16,20 @@ export default function Training() {
   const [metrics, setMetrics] = useState({ loss: null, acc: null, epoch: 0 });
   const { addToast } = useToast();
 
+  const [tabularAnalysis, setTabularAnalysis] = useState(null);
+  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  const [prepConfig, setPrepConfig] = useState({
+    imputation_strategy: 'none',
+    categorical_encoding: 'none',
+    scaling: 'none',
+    drop_columns: '',
+    target_column: ''
+  });
+  const [showPrepOptions, setShowPrepOptions] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+
   // Load datasets and check running status on mount
-  React.useEffect(() => {
+  useEffect(() => {
     api.listDatasets().then(ds => {
       setDatasets(ds || []);
       if (ds?.length > 0 && !config.dataset_id) {
@@ -50,6 +62,24 @@ export default function Training() {
       }
     }).catch(() => {});
   }, []);
+
+  const selectedDataset = datasets.find(d => d.id === config.dataset_id);
+  const isTabular = selectedDataset?.type === 'csv';
+
+  useEffect(() => {
+    if (config.dataset_id && isTabular) {
+      setLoadingAnalysis(true);
+      api.analyzeDataset(config.dataset_id)
+        .then(data => {
+          setTabularAnalysis(data);
+          setPrepConfig(prev => ({...prev, target_column: selectedDataset.target_column || ''}));
+        })
+        .catch(() => setTabularAnalysis(null))
+        .finally(() => setLoadingAnalysis(false));
+    } else {
+      setTabularAnalysis(null);
+    }
+  }, [config.dataset_id, isTabular]);
 
   useTrainingSocket((msg) => {
     if (msg.status === 'training') {
@@ -86,6 +116,22 @@ export default function Training() {
   const handleStop = async () => {
     if (runId) await api.stopTraining(runId);
     setStatus('idle');
+  };
+
+  const handleDownloadPreprocessed = async () => {
+    setIsDownloading(true);
+    try {
+      const options = {
+        ...prepConfig,
+        drop_columns: prepConfig.drop_columns ? prepConfig.drop_columns.split(',').map(s => s.trim()).filter(Boolean) : [],
+        target_column: prepConfig.target_column || null
+      };
+      await api.downloadPreprocessedDataset(config.dataset_id, options);
+      addToast('Download started successfully', 'success');
+    } catch (e) {
+      addToast('Failed to download preprocessed data', 'error');
+    }
+    setIsDownloading(false);
   };
 
   return (
@@ -150,6 +196,96 @@ export default function Training() {
                 />
               </div>
             </div>
+
+            {/* Tabular Preprocessing block */}
+            {isTabular && (
+              <div className="border border-glass rounded-lg overflow-hidden my-4 bg-surface/30">
+                <button 
+                  className="w-full flex items-center justify-between p-3 bg-white/5 hover:bg-white/10 transition-colors"
+                  onClick={() => setShowPrepOptions(!showPrepOptions)}
+                >
+                  <span className="font-semibold text-sm flex items-center gap-2">
+                    <DatabaseIcon size={16} /> Data Analysis & Preprocessing
+                  </span>
+                  {showPrepOptions ? <ChevronLeftIcon size={16} style={{transform: 'rotate(-90deg)'}} /> : <ChevronLeftIcon size={16} style={{transform: 'rotate(180deg)'}} />}
+                </button>
+                
+                {showPrepOptions && (
+                  <div className="p-4 space-y-4 text-sm animate-fade-in border-t border-glass">
+                    {loadingAnalysis ? (
+                      <div className="text-muted text-center py-4">Analyzing dataset...</div>
+                    ) : tabularAnalysis ? (
+                      <>
+                        <div className="grid grid-cols-2 gap-4 text-xs bg-dark p-3 rounded mb-4">
+                          <div>
+                            <span className="text-muted block uppercase">Rows / Cols</span>
+                            <span className="font-mono">{tabularAnalysis.total_rows.toLocaleString()} / {tabularAnalysis.total_columns}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted block uppercase">Total Missing</span>
+                            <span className={`font-mono ${tabularAnalysis.total_missing > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                              {tabularAnalysis.total_missing.toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="input-group">
+                          <label className="input-label text-xs">Target Column</label>
+                          <select className="input-field py-1 text-xs" value={prepConfig.target_column} onChange={e => setPrepConfig({...prepConfig, target_column: e.target.value})}>
+                            <option value="">(None)</option>
+                            {tabularAnalysis.columns.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                          </select>
+                        </div>
+
+                        <div className="input-group">
+                          <label className="input-label text-xs">Missing Values Imputation</label>
+                          <select className="input-field py-1 text-xs" value={prepConfig.imputation_strategy} onChange={e => setPrepConfig({...prepConfig, imputation_strategy: e.target.value})}>
+                            <option value="none">None (Leave as is)</option>
+                            <option value="drop">Drop Rows with Missing</option>
+                            <option value="mean">Mean (Num) + Mode (Cat)</option>
+                            <option value="median">Median (Num) + Mode (Cat)</option>
+                            <option value="most_frequent">Most Frequent (All)</option>
+                          </select>
+                        </div>
+
+                        <div className="input-group">
+                          <label className="input-label text-xs">Categorical Encoding</label>
+                          <select className="input-field py-1 text-xs" value={prepConfig.categorical_encoding} onChange={e => setPrepConfig({...prepConfig, categorical_encoding: e.target.value})}>
+                            <option value="none">None (Leave as is)</option>
+                            <option value="onehot">One-Hot Encoding</option>
+                            <option value="label">Label Encoding</option>
+                          </select>
+                        </div>
+                        
+                        <div className="input-group">
+                          <label className="input-label text-xs">Scaling (Numerical)</label>
+                          <select className="input-field py-1 text-xs" value={prepConfig.scaling} onChange={e => setPrepConfig({...prepConfig, scaling: e.target.value})}>
+                            <option value="none">None (Leave as is)</option>
+                            <option value="standard">Standard Scaler</option>
+                            <option value="minmax">MinMax Scaler</option>
+                          </select>
+                        </div>
+
+                        <div className="input-group">
+                          <label className="input-label text-xs">Drop Columns (Comma separated)</label>
+                          <input type="text" className="input-field py-1 text-xs" placeholder="e.g. id, Name, Ticket" value={prepConfig.drop_columns} onChange={e => setPrepConfig({...prepConfig, drop_columns: e.target.value})} />
+                        </div>
+
+                        <button 
+                          className="btn btn-secondary w-full py-1.5 text-xs flex items-center justify-center gap-2 mt-4"
+                          onClick={handleDownloadPreprocessed}
+                          disabled={isDownloading}
+                        >
+                          <DownloadIcon size={14} /> {isDownloading ? 'Processing...' : 'Download Preprocessed'}
+                        </button>
+                      </>
+                    ) : (
+                      <div className="text-rose-400 text-center py-4">Failed to load analysis.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="pt-4 border-t border-glass">
               {status === 'idle' || status === 'completed' ? (
