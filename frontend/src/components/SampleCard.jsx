@@ -38,7 +38,7 @@ export default function SampleCard({ sample, datasetId, onClose }) {
   if (!sample) return null;
 
   return (
-    <div className="glass-card flex flex-col h-full overflow-y-auto">
+    <div className="modal-content flex flex-col max-h-[90vh] overflow-y-auto">
       <div className="flex justify-between items-start mb-4">
         <div>
           <h3 className="text-lg font-bold">Sample #{sample.sample_index}</h3>

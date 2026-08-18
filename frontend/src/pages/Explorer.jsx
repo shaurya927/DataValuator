@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import ScatterPlot from '../components/ScatterPlot';
 import SampleTable from '../components/SampleTable';
 import SampleCard from '../components/SampleCard';
@@ -52,7 +53,8 @@ export default function Explorer() {
   }, [selectedRun]);
 
   const handlePointClick = useCallback((index) => {
-    const sample = data.find(d => (d.sample_index ?? d.index) === index);
+    // Use loose equality (==) in case Plotly returns customdata as a string
+    const sample = data.find(d => (d.sample_index ?? d.index) == index);
     if (sample) setSelectedSample(sample);
   }, [data]);
 
@@ -185,16 +187,6 @@ export default function Explorer() {
             )}
           </div>
           
-          {/* Sidebar: Sample Details */}
-          {selectedSample && (
-            <div className="shrink-0" style={{ width: '400px' }}>
-              <SampleCard 
-                sample={selectedSample} 
-                datasetId={selectedRun?.dataset_id}
-                onClose={() => setSelectedSample(null)} 
-              />
-            </div>
-          )}
         </div>
 
         {/* Bottom Area: Table */}
@@ -210,6 +202,18 @@ export default function Explorer() {
           </div>
         </div>
       </div>
+      
+      {/* Modal Popup: Sample Details */}
+      {selectedSample && createPortal(
+        <div className="modal-overlay p-4" onClick={(e) => { if (e.target.classList.contains('modal-overlay')) setSelectedSample(null); }}>
+          <SampleCard 
+            sample={selectedSample} 
+            datasetId={selectedRun?.dataset_id}
+            onClose={() => setSelectedSample(null)} 
+          />
+        </div>,
+        document.body
+      )}
       
       <BatchToolbar 
         visible={selectedIndices.size > 0} 

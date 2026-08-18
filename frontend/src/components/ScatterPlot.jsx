@@ -57,8 +57,19 @@ export default React.memo(function ScatterPlot({ data, onPointClick }) {
 
   const handleClick = (e) => {
     if (e.points && e.points[0] && onPointClick) {
-      const index = e.points[0].customdata;
-      onPointClick(index);
+      let index = e.points[0].customdata;
+      // If customdata is an array (Plotly sometimes does this), extract the first element
+      if (Array.isArray(index)) index = index[0];
+      
+      // Fallback: If customdata was stripped, parse it from the hover text
+      if (index === undefined && e.points[0].text) {
+        const match = e.points[0].text.match(/Index:\s*(\d+)/);
+        if (match) index = parseInt(match[1], 10);
+      }
+      
+      if (index !== undefined) {
+        onPointClick(index);
+      }
     }
   };
 
