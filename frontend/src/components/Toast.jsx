@@ -74,15 +74,15 @@ const Toast = ({ id, message, type, onClose }) => {
       display: 'flex',
       flexDirection: 'column',
       width: '320px',
-      backgroundColor: 'rgba(17, 17, 17, 0.95)',
+      backgroundColor: 'var(--bg-surface-elevated)',
       backdropFilter: 'blur(16px)',
       WebkitBackdropFilter: 'blur(16px)',
-      border: '1px solid rgba(255, 255, 255, 0.06)',
+      border: '1px solid var(--border-glass)',
       borderRadius: '12px',
       boxShadow: `0 8px 32px 0 ${style.glow}`,
       marginBottom: '12px',
       overflow: 'hidden',
-      color: '#e8e8e8',
+      color: 'var(--text-primary)',
       fontFamily: 'Inter, system-ui, sans-serif',
       fontSize: '14px',
       animation: `${isLeaving ? 'toastSlideOut 0.3s forwards' : 'toastSlideIn 0.3s forwards'}`,
@@ -98,11 +98,11 @@ const Toast = ({ id, message, type, onClose }) => {
         <button 
           onClick={handleClose}
           style={{ 
-            background: 'none', border: 'none', color: '#a0a0a0', cursor: 'pointer',
+            background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer',
             padding: '2px', marginLeft: '8px', display: 'flex', alignItems: 'center'
           }}
-          onMouseOver={(e) => e.currentTarget.style.color = '#e8e8e8'}
-          onMouseOut={(e) => e.currentTarget.style.color = '#a0a0a0'}
+          onMouseOver={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+          onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
         >
           <CloseIcon />
         </button>

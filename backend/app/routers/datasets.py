@@ -49,9 +49,13 @@ async def upload_dataset(
             current_dir = os.path.join(current_dir, items[0])
             items = os.listdir(current_dir)
             
-        # Update path to point to the actual directory with classes
-        file_path = current_dir
-        ds_type = 'image_folder'
+        csv_files = [f for f in items if f.lower().endswith('.csv')]
+        if len(csv_files) > 0:
+            file_path = os.path.join(current_dir, csv_files[0])
+            ds_type = 'csv'
+        else:
+            file_path = current_dir
+            ds_type = 'image_folder'
     else:
         ds_type = 'csv' if filename.endswith('.csv') else 'image_folder'
     

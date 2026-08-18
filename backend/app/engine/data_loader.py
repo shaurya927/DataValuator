@@ -111,10 +111,17 @@ def load_csv_dataset(path: str, target_col: str, batch_size: int = 64) -> Tuple[
     if target_col in numeric_cols:
         numeric_cols.remove(target_col)
     
+    # Fill missing values in numeric columns with 0
+    df[numeric_cols] = df[numeric_cols].fillna(0)
     X = df[numeric_cols].values
     
+    # Drop rows where target is NaN before converting to codes
+    df = df.dropna(subset=[target_col])
     y = df[target_col].astype('category').cat.codes.values
     classes = df[target_col].astype('category').cat.categories.tolist()
+    
+    # Re-extract X after dropping rows
+    X = df[numeric_cols].values
 
     rng = np.random.RandomState(42)
     indices = rng.permutation(len(X))

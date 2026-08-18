@@ -122,6 +122,7 @@ export default function Training() {
               >
                 <option value="simple_cnn">Simple CNN</option>
                 <option value="resnet18">ResNet-18</option>
+                <option value="tabular">Simple Tabular Net</option>
               </select>
             </div>
 
