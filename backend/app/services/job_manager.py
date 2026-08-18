@@ -71,7 +71,7 @@ class JobManager:
                 raise ValueError(f"Dataset {config_dict['dataset_id']} not found")
 
             train_loader, val_loader, ds_meta = await asyncio.to_thread(
-                self._load_dataset, dataset_info, config_dict.get("target_column")
+                self._load_dataset, dataset_info, config_dict.get("target_column"), config_dict.get("task_type", "classification")
             )
 
             # ---------- 2. Train model ---------- #
@@ -103,6 +103,7 @@ class JobManager:
                 progress_callback,
                 ds_meta.get("sample_shape"),
                 self.cancel_event,
+                config_dict.get("task_type", "classification")
             )
 
             if self.cancel_event.is_set():
@@ -212,7 +213,7 @@ class JobManager:
     # ---- blocking helpers (run in thread) ---- #
 
     @staticmethod
-    def _load_dataset(dataset_info: dict, target_column: str = None):
+    def _load_dataset(dataset_info: dict, target_column: str = None, task_type: str = "classification"):
         """Load dataset based on type — runs in thread."""
         from app.engine.data_loader import load_cifar10, load_image_folder, load_csv_dataset
 
@@ -225,7 +226,7 @@ class JobManager:
         elif ds_type == "image_folder":
             return load_image_folder(ds_path)
         elif ds_type == "csv":
-            return load_csv_dataset(ds_path, target_col=t_col)
+            return load_csv_dataset(ds_path, target_col=t_col, task_type=task_type)
         else:
             raise ValueError(f"Unknown dataset type: {ds_type}")
 
@@ -233,16 +234,17 @@ class JobManager:
     def _train_model(model_name, num_classes, train_loader, val_loader,
                      epochs, lr, checkpoint_dir, metrics_path,
                      checkpoint_interval, progress_callback, sample_shape=None,
-                     cancel_event=None):
+                     cancel_event=None, task_type="classification"):
         """Run the training loop — blocking, runs in thread."""
         from app.engine.models import get_model
-        from app.engine.trainer import DataValuatorTrainer
-
+        
         kwargs = {}
         if model_name == 'tabular' and sample_shape:
             kwargs['input_dim'] = sample_shape[0]
+            
+        kwargs['num_classes'] = num_classes
 
-        model = get_model(model_name, num_classes, **kwargs)
+        model = get_model(model_name, task_type, **kwargs)
 
         config = {
             "epochs": epochs,
@@ -252,93 +254,43 @@ class JobManager:
             "checkpoint_interval": checkpoint_interval,
         }
 
-        trainer = DataValuatorTrainer(
-            model=model,
-            train_loader=train_loader,
-            val_loader=val_loader,
+        # Train model
+        trainer_results = model.train(
+            train_data=train_loader,
+            val_data=val_loader,
             config=config,
             progress_callback=progress_callback,
-            cancel_event=cancel_event,
+            cancel_event=cancel_event
         )
 
-        tracker_results = trainer.train()
-
-        # Attach final metrics
-        tracker_results["model"] = model
-        tracker_results["final_train_loss"] = float(tracker_results.get("final_train_loss", 0.0))
-        tracker_results["final_val_accuracy"] = float(tracker_results.get("final_val_accuracy", 0.0))
-
-        return tracker_results
+        return trainer_results
 
     @staticmethod
     def _compute_valuations(model_name, num_classes, checkpoint_dir,
                             train_loader, val_loader, trainer_results, configured_lr):
-        """Post-training valuation: TracIn + embeddings + unified scores."""
-        import torch
-        from app.engine.models import get_model
-        from app.engine.tracin import compute_tracin_scores
-        from app.engine.embeddings import extract_embeddings, compute_rarity_scores, compute_umap_projection
-        from app.engine.valuator import compute_unified_scores
-
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        model = trainer_results.get("model")
-        if model is None:
-            model = get_model(model_name, num_classes)
-
-        # Collect checkpoint paths and learning rates
-        checkpoint_files = sorted([
-            f for f in os.listdir(checkpoint_dir) if f.endswith(".pt") and f != "ckpt_final.pt"
-        ])
-        checkpoint_paths = [os.path.join(checkpoint_dir, f) for f in checkpoint_files]
-
-        # TracIn scores
-        if len(checkpoint_paths) >= 2:
-            lrs = []
-            for path in checkpoint_paths:
-                ckpt = torch.load(path, map_location="cpu", weights_only=True)
-                lrs.append(ckpt.get("learning_rate", configured_lr))
-
-            kwargs = {}
-            if model_name == 'tabular':
-                # Tabular needs input_dim, we can infer it from the trained model
-                kwargs['input_dim'] = model.fc1.in_features
-
-            tracin_scores = compute_tracin_scores(
-                model_factory=lambda: get_model(model_name, num_classes, **kwargs),
-                checkpoint_paths=checkpoint_paths,
-                learning_rates=lrs,
-                train_loader=train_loader,
-                val_loader=val_loader,
-                device=device,
-            )
-        else:
-            tracin_scores = np.zeros(len(train_loader.dataset), dtype=np.float32)
-
-        # Embeddings & rarity
-        model.eval()
-        embeddings, indices = extract_embeddings(model, train_loader, device)
-        rarity_scores = compute_rarity_scores(embeddings)
-        embeddings_2d = compute_umap_projection(embeddings)
-
-        # Unified scores
-        forgetting_counts = trainer_results["forgetting_counts"]
-        avg_loss = trainer_results["avg_loss"]
-        aum_scores = trainer_results["aum_scores"]
-
-        unified_scores, categories = compute_unified_scores(
-            forgetting_counts, avg_loss, aum_scores, tracin_scores, rarity_scores,
+        """Post-training valuation: delegated to Valuator instances."""
+        from app.engine.valuation import get_valuator
+        
+        model_adapter = trainer_results.get("model")
+        
+        # Determine valuation method from model
+        val_method = model_adapter.supported_valuation_method if model_adapter else "tracin"
+        
+        valuator = get_valuator(
+            val_method,
+            checkpoint_dir=checkpoint_dir,
+            configured_lr=configured_lr,
+            trainer_results=trainer_results,
+            n_iterations=10 # For LOO fast approximation
         )
-
-        return {
-            "forgetting_counts": forgetting_counts,
-            "avg_loss": avg_loss,
-            "aum_scores": aum_scores,
-            "tracin_scores": tracin_scores,
-            "rarity_scores": rarity_scores,
-            "unified_scores": unified_scores,
-            "categories": categories,
-            "embeddings_2d": embeddings_2d,
-        }
+        
+        valuation_data = valuator.calculate_influence(
+            model_adapter=model_adapter,
+            train_data=train_loader,
+            val_data=val_loader
+        )
+        
+        return valuation_data
 
     # ------------------------------------------------------------------ #
     #  Experiment pipeline                                                #

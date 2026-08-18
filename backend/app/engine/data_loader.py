@@ -4,7 +4,11 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import datasets, transforms
-from typing import Tuple, Dict, Any
+from typing import Tuple, Dict, Any, Optional
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder, StandardScaler, LabelEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
 
 class IndexedDataset(Dataset):
     """Wrapper dataset that yields (index, data, target) tuples."""
@@ -93,9 +97,12 @@ def load_image_folder(path: str, batch_size: int = 64, img_size: int = 32) -> Tu
     return train_loader, val_loader, dataset_info
 
 class TabularDataset(Dataset):
-    def __init__(self, data: np.ndarray, targets: np.ndarray):
+    def __init__(self, data: np.ndarray, targets: np.ndarray, task_type: str = "classification"):
         self.data = torch.tensor(data, dtype=torch.float32)
-        self.targets = torch.tensor(targets, dtype=torch.long)
+        if task_type == "classification":
+            self.targets = torch.tensor(targets, dtype=torch.long)
+        else:
+            self.targets = torch.tensor(targets, dtype=torch.float32).unsqueeze(1)
 
     def __len__(self) -> int:
         return len(self.data)
@@ -103,45 +110,84 @@ class TabularDataset(Dataset):
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
         return self.data[idx], self.targets[idx]
 
-def load_csv_dataset(path: str, target_col: str, batch_size: int = 64) -> Tuple[DataLoader, DataLoader, Dict[str, Any]]:
-    """Loads tabular dataset from CSV."""
+def create_pytorch_dataloaders(X_train: np.ndarray, y_train: np.ndarray, X_val: np.ndarray, y_val: np.ndarray, task_type: str = "classification", batch_size: int = 64) -> Tuple[DataLoader, DataLoader]:
+    """Helper to convert numpy arrays into PyTorch DataLoaders with IndexedDataset."""
+    train_set = TabularDataset(X_train, y_train, task_type)
+    val_set = TabularDataset(X_val, y_val, task_type)
+    
+    indexed_train = IndexedDataset(train_set)
+    indexed_val = IndexedDataset(val_set)
+    
+    train_loader = DataLoader(indexed_train, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(indexed_val, batch_size=batch_size, shuffle=False)
+    
+    return train_loader, val_loader
+
+def load_csv_dataset(path: str, target_col: str, task_type: str = "classification") -> Tuple[Tuple[np.ndarray, np.ndarray], Tuple[np.ndarray, np.ndarray], Dict[str, Any]]:
+    """Loads and robustly preprocesses tabular dataset for any model type."""
     df = pd.read_csv(path)
     
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    if target_col in numeric_cols:
-        numeric_cols.remove(target_col)
+    # Drop rows where target is NaN
+    if target_col in df.columns:
+        df = df.dropna(subset=[target_col])
+    else:
+        # Fallback if target_col is somehow missing, just pick the last column
+        target_col = df.columns[-1]
+        df = df.dropna(subset=[target_col])
+        
+    y_raw = df[target_col].values
+    X_df = df.drop(columns=[target_col])
     
-    # Fill missing values in numeric columns with 0
-    df[numeric_cols] = df[numeric_cols].fillna(0)
-    X = df[numeric_cols].values
+    # Identify column types
+    numeric_cols = X_df.select_dtypes(include=[np.number]).columns.tolist()
+    categorical_cols = X_df.select_dtypes(exclude=[np.number]).columns.tolist()
     
-    # Drop rows where target is NaN before converting to codes
-    df = df.dropna(subset=[target_col])
-    y = df[target_col].astype('category').cat.codes.values
-    classes = df[target_col].astype('category').cat.categories.tolist()
+    # Create preprocessing pipelines
+    numeric_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='mean')),
+        ('scaler', StandardScaler())
+    ])
     
-    # Re-extract X after dropping rows
-    X = df[numeric_cols].values
-
+    categorical_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='most_frequent')),
+        ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
+    ])
+    
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('num', numeric_transformer, numeric_cols),
+            ('cat', categorical_transformer, categorical_cols)
+        ]
+    )
+    
+    X = preprocessor.fit_transform(X_df)
+    
+    # Process target
+    if task_type == "classification":
+        le = LabelEncoder()
+        y = le.fit_transform(y_raw)
+        classes = list(le.classes_)
+        num_classes = len(classes)
+    else:
+        y = y_raw.astype(np.float32)
+        classes = []
+        num_classes = 1
+        
+    # Split 80/20 deterministically
     rng = np.random.RandomState(42)
     indices = rng.permutation(len(X))
     split_idx = int(0.8 * len(X))
     train_idx, val_idx = indices[:split_idx], indices[split_idx:]
-
-    train_set = TabularDataset(X[train_idx], y[train_idx])
-    val_set = TabularDataset(X[val_idx], y[val_idx])
-
-    indexed_train = IndexedDataset(train_set)
-    indexed_val = IndexedDataset(val_set)
-
-    train_loader = DataLoader(indexed_train, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(indexed_val, batch_size=batch_size, shuffle=False)
-
+    
+    X_train, X_val = X[train_idx], X[val_idx]
+    y_train, y_val = y[train_idx], y[val_idx]
+    
     dataset_info = {
-        "num_samples": len(train_set),
-        "num_classes": len(classes),
+        "num_samples": len(X_train),
+        "num_classes": num_classes,
         "class_names": classes,
-        "sample_shape": (len(numeric_cols),)
+        "sample_shape": (X.shape[1],),
+        "task_type": task_type
     }
-
-    return train_loader, val_loader, dataset_info
+    
+    return (X_train, y_train), (X_val, y_val), dataset_info

@@ -7,195 +7,252 @@ import { useToast } from '../components/Toast';
 
 export default function Training() {
   const [status, setStatus] = useState('idle'); // idle, training, completed
-  const [config, setConfig] = useState({ dataset_id: '', model_name: 'simple_cnn', epochs: 20, learning_rate: 0.01 });
-  const [datasets, setDatasets] = useState([]);
-  const [runId, setRunId] = useState(null);
-  
-  const [history, setHistory] = useState([]);
-  const [progress, setProgress] = useState(0);
-  const [metrics, setMetrics] = useState({ loss: null, acc: null, epoch: 0 });
-  const { addToast } = useToast();
+    const [config, setConfig] = useState({ dataset_id: '', model_name: 'simple_cnn', task_type: 'classification', epochs: 20, learning_rate: 0.01 });
 
-  const [tabularAnalysis, setTabularAnalysis] = useState(null);
-  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
-  const [prepConfig, setPrepConfig] = useState({
-    imputation_strategy: 'none',
-    categorical_encoding: 'none',
-    scaling: 'none',
-    drop_columns: '',
-    target_column: ''
-  });
-  const [showPrepOptions, setShowPrepOptions] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
+    // ... (Keep existing states) ...
+    const [datasets, setDatasets] = useState([]);
+    const [runId, setRunId] = useState(null);
+    const [history, setHistory] = useState([]);
+    const [progress, setProgress] = useState(0);
+    const [metrics, setMetrics] = useState({ loss: null, acc: null, epoch: 0 });
+    const { addToast } = useToast();
 
-  // Load datasets and check running status on mount
-  useEffect(() => {
-    api.listDatasets().then(ds => {
-      setDatasets(ds || []);
-      if (ds?.length > 0 && !config.dataset_id) {
-        setConfig(prev => ({ ...prev, dataset_id: ds[0].id }));
+    const [tabularAnalysis, setTabularAnalysis] = useState(null);
+    const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+    const [prepConfig, setPrepConfig] = useState({
+      imputation_strategy: 'none',
+      categorical_encoding: 'none',
+      scaling: 'none',
+      drop_columns: '',
+      target_column: ''
+    });
+    const [showPrepOptions, setShowPrepOptions] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
+
+    // Load datasets and check running status on mount
+    useEffect(() => {
+      api.listDatasets().then(ds => {
+        setDatasets(ds || []);
+        if (ds?.length > 0 && !config.dataset_id) {
+          setConfig(prev => ({ ...prev, dataset_id: ds[0].id }));
+        }
+      }).catch(() => addToast('Failed to load datasets', 'error'));
+
+      api.getTrainingStatus().then(async (statusRes) => {
+        if (statusRes && statusRes.status === 'running') {
+          setStatus('training');
+          setRunId(statusRes.id);
+          try {
+            const runDetails = await api.getTrainingRun(statusRes.id);
+            if (runDetails) {
+              setProgress(runDetails.current_epoch ? (runDetails.current_epoch / runDetails.epochs) * 100 : 0);
+              setConfig(prev => ({
+                ...prev,
+                dataset_id: runDetails.dataset_id || prev.dataset_id,
+                model_name: runDetails.model_name || prev.model_name,
+                task_type: runDetails.task_type || prev.task_type,
+                epochs: runDetails.epochs || prev.epochs,
+                learning_rate: runDetails.learning_rate || prev.learning_rate
+              }));
+              setMetrics({
+                loss: runDetails.train_loss,
+                acc: runDetails.val_accuracy,
+                epoch: runDetails.current_epoch
+              });
+            }
+          } catch (e) {}
+        }
+      }).catch(() => {});
+    }, []);
+
+    const selectedDataset = datasets.find(d => d.id === config.dataset_id);
+    const isTabular = selectedDataset?.type === 'csv';
+
+    // Auto-switch models if switching dataset types
+    useEffect(() => {
+      if (isTabular && ['simple_cnn', 'resnet18'].includes(config.model_name)) {
+        setConfig(prev => ({ ...prev, model_name: 'random_forest' }));
+      } else if (!isTabular && !['simple_cnn', 'resnet18'].includes(config.model_name)) {
+        setConfig(prev => ({ ...prev, model_name: 'simple_cnn', task_type: 'classification' }));
       }
-    }).catch(() => addToast('Failed to load datasets', 'error'));
+    }, [isTabular, config.dataset_id]);
 
-    api.getTrainingStatus().then(async (statusRes) => {
-      if (statusRes && statusRes.status === 'running') {
+    useEffect(() => {
+      if (config.dataset_id && isTabular) {
+        setLoadingAnalysis(true);
+        api.analyzeDataset(config.dataset_id)
+          .then(data => {
+            setTabularAnalysis(data);
+            setPrepConfig(prev => ({...prev, target_column: selectedDataset.target_column || ''}));
+          })
+          .catch(() => setTabularAnalysis(null))
+          .finally(() => setLoadingAnalysis(false));
+      } else {
+        setTabularAnalysis(null);
+      }
+    }, [config.dataset_id, isTabular]);
+
+    useTrainingSocket((msg) => {
+      if (msg.status === 'training') {
         setStatus('training');
-        setRunId(statusRes.id);
-        try {
-          const runDetails = await api.getTrainingRun(statusRes.id);
-          if (runDetails) {
-            setProgress(runDetails.current_epoch ? (runDetails.current_epoch / runDetails.epochs) * 100 : 0);
-            setConfig(prev => ({
-              ...prev,
-              dataset_id: runDetails.dataset_id || prev.dataset_id,
-              model_name: runDetails.model_name || prev.model_name,
-              epochs: runDetails.epochs || prev.epochs,
-              learning_rate: runDetails.learning_rate || prev.learning_rate
-            }));
-            setMetrics({
-              loss: runDetails.train_loss,
-              acc: runDetails.val_accuracy,
-              epoch: runDetails.current_epoch
-            });
-          }
-        } catch (e) {}
+        setProgress(msg.progress || 0);
+        setMetrics({ loss: msg.train_loss, acc: msg.val_accuracy, epoch: msg.epoch });
+        setHistory(prev => [...prev, { epoch: msg.epoch, loss: msg.train_loss, accuracy: msg.val_accuracy }]);
+      } else if (msg.status === 'computing_valuations' || msg.status === 'storing_results') {
+        setStatus(msg.status);
+        setProgress(100);
+      } else if (msg.status === 'completed') {
+        setStatus('completed');
+        setProgress(100);
+        addToast('Training completed successfully!', 'success');
+      } else if (msg.status === 'failed') {
+        setStatus('idle');
+        addToast('Training failed', 'error');
       }
-    }).catch(() => {});
-  }, []);
+    });
 
-  const selectedDataset = datasets.find(d => d.id === config.dataset_id);
-  const isTabular = selectedDataset?.type === 'csv';
-
-  useEffect(() => {
-    if (config.dataset_id && isTabular) {
-      setLoadingAnalysis(true);
-      api.analyzeDataset(config.dataset_id)
-        .then(data => {
-          setTabularAnalysis(data);
-          setPrepConfig(prev => ({...prev, target_column: selectedDataset.target_column || ''}));
-        })
-        .catch(() => setTabularAnalysis(null))
-        .finally(() => setLoadingAnalysis(false));
-    } else {
-      setTabularAnalysis(null);
-    }
-  }, [config.dataset_id, isTabular]);
-
-  useTrainingSocket((msg) => {
-    if (msg.status === 'training') {
+    const handleStart = async () => {
       setStatus('training');
-      setProgress(msg.progress || 0);
-      setMetrics({ loss: msg.train_loss, acc: msg.val_accuracy, epoch: msg.epoch });
-      setHistory(prev => [...prev, { epoch: msg.epoch, loss: msg.train_loss, accuracy: msg.val_accuracy }]);
-    } else if (msg.status === 'computing_valuations' || msg.status === 'storing_results') {
-      setStatus(msg.status);
-      setProgress(100);
-    } else if (msg.status === 'completed') {
-      setStatus('completed');
-      setProgress(100);
-      addToast('Training completed successfully!', 'success');
-    } else if (msg.status === 'failed') {
+      setHistory([]);
+      setProgress(0);
+      try {
+        const res = await api.startTraining(config);
+        setRunId(res.run_id || res.runId);
+      } catch (e) {
+        setStatus('idle');
+        addToast('Failed to start training: ' + (e.message || 'Unknown error'), 'error');
+      }
+    };
+
+    const handleStop = async () => {
+      if (runId) await api.stopTraining(runId);
       setStatus('idle');
-      addToast('Training failed', 'error');
-    }
-  });
+    };
 
-  const handleStart = async () => {
-    setStatus('training');
-    setHistory([]);
-    setProgress(0);
-    try {
-      const res = await api.startTraining(config);
-      setRunId(res.run_id || res.runId);
-    } catch (e) {
-      setStatus('idle');
-      addToast('Failed to start training: ' + (e.message || 'Unknown error'), 'error');
-    }
-  };
+    const handleDownloadPreprocessed = async () => {
+      setIsDownloading(true);
+      try {
+        const options = {
+          ...prepConfig,
+          drop_columns: prepConfig.drop_columns ? prepConfig.drop_columns.split(',').map(s => s.trim()).filter(Boolean) : [],
+          target_column: prepConfig.target_column || null
+        };
+        await api.downloadPreprocessedDataset(config.dataset_id, options);
+        addToast('Download started successfully', 'success');
+      } catch (e) {
+        addToast('Failed to download preprocessed data', 'error');
+      }
+      setIsDownloading(false);
+    };
 
-  const handleStop = async () => {
-    if (runId) await api.stopTraining(runId);
-    setStatus('idle');
-  };
+    const isSklearn = ['logistic_regression', 'linear_regression', 'decision_tree', 'random_forest'].includes(config.model_name);
 
-  const handleDownloadPreprocessed = async () => {
-    setIsDownloading(true);
-    try {
-      const options = {
-        ...prepConfig,
-        drop_columns: prepConfig.drop_columns ? prepConfig.drop_columns.split(',').map(s => s.trim()).filter(Boolean) : [],
-        target_column: prepConfig.target_column || null
-      };
-      await api.downloadPreprocessedDataset(config.dataset_id, options);
-      addToast('Download started successfully', 'success');
-    } catch (e) {
-      addToast('Failed to download preprocessed data', 'error');
-    }
-    setIsDownloading(false);
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Config Panel */}
-        <div className="glass-card lg:col-span-1">
-          <h3 className="text-lg font-semibold mb-4 border-b border-glass pb-2">Training Configuration</h3>
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          <div className="space-y-4">
-            <div className="input-group">
-              <label className="input-label">Dataset</label>
-              <select 
-                className="input-field" 
-                value={config.dataset_id}
-                onChange={e => setConfig({...config, dataset_id: e.target.value})}
-                disabled={status === 'training'}
-              >
-                <option value="">Select a dataset...</option>
-                {datasets.map(ds => (
-                  <option key={ds.id} value={ds.id}>{ds.name} ({ds.num_samples} samples)</option>
-                ))}
-              </select>
-            </div>
+          {/* Config Panel */}
+          <div className="glass-card lg:col-span-1">
+            <h3 className="text-lg font-semibold mb-4 border-b border-glass pb-2">Training Configuration</h3>
             
-            <div className="input-group">
-              <label className="input-label">Model Architecture</label>
-              <select 
-                className="input-field"
-                value={config.model_name}
-                onChange={e => setConfig({...config, model_name: e.target.value})}
-                disabled={status === 'training'}
-              >
-                <option value="simple_cnn">Simple CNN</option>
-                <option value="resnet18">ResNet-18</option>
-                <option value="tabular">Simple Tabular Net</option>
-              </select>
-            </div>
+            <div className="space-y-4">
+              <div className="input-group">
+                <label className="input-label">Dataset</label>
+                <select 
+                  className="input-field" 
+                  value={config.dataset_id}
+                  onChange={e => setConfig({...config, dataset_id: e.target.value})}
+                  disabled={status === 'training'}
+                >
+                  <option value="">Select a dataset...</option>
+                  {datasets.map(ds => (
+                    <option key={ds.id} value={ds.id}>{ds.name} ({ds.num_samples} samples)</option>
+                  ))}
+                </select>
+              </div>
 
-            <div className="grid grid-cols-2 gap-4">
+              {isTabular && (
+                <div className="input-group">
+                  <label className="input-label">Task Type</label>
+                  <select 
+                    className="input-field"
+                    value={config.task_type}
+                    onChange={e => {
+                      const newType = e.target.value;
+                      let newModel = config.model_name;
+                      if (newType === 'regression' && config.model_name === 'logistic_regression') newModel = 'linear_regression';
+                      if (newType === 'classification' && config.model_name === 'linear_regression') newModel = 'logistic_regression';
+                      setConfig({...config, task_type: newType, model_name: newModel});
+                    }}
+                    disabled={status === 'training'}
+                  >
+                    <option value="classification">Classification</option>
+                    <option value="regression">Regression</option>
+                  </select>
+                </div>
+              )}
+              
               <div className="input-group">
-                <label className="input-label">Epochs</label>
-                <input 
-                  type="number" 
-                  className="input-field" 
-                  value={config.epochs}
-                  min={1} max={200}
-                  onChange={e => setConfig({...config, epochs: parseInt(e.target.value) || 20})}
+                <label className="input-label">Model Architecture</label>
+                <select 
+                  className="input-field"
+                  value={config.model_name}
+                  onChange={e => setConfig({...config, model_name: e.target.value})}
                   disabled={status === 'training'}
-                />
+                >
+                  {!isTabular && (
+                    <>
+                      <option value="simple_cnn">Simple CNN (PyTorch)</option>
+                      <option value="resnet18">ResNet-18 (PyTorch)</option>
+                    </>
+                  )}
+                  {isTabular && config.task_type === 'classification' && (
+                    <>
+                      <option value="logistic_regression">Logistic Regression (SKLearn)</option>
+                      <option value="decision_tree">Decision Tree (SKLearn)</option>
+                      <option value="random_forest">Random Forest (SKLearn)</option>
+
+                      <option value="tabular">Simple Tabular Net (PyTorch)</option>
+                    </>
+                  )}
+                  {isTabular && config.task_type === 'regression' && (
+                    <>
+                      <option value="linear_regression">Linear Regression (SKLearn)</option>
+                      <option value="decision_tree">Decision Tree (SKLearn)</option>
+                      <option value="random_forest">Random Forest (SKLearn)</option>
+
+                      <option value="tabular">Simple Tabular Regressor (PyTorch)</option>
+                    </>
+                  )}
+                </select>
               </div>
-              <div className="input-group">
-                <label className="input-label">Learning Rate</label>
-                <input 
-                  type="number" 
-                  step="0.001"
-                  className="input-field" 
-                  value={config.learning_rate}
-                  onChange={e => setConfig({...config, learning_rate: parseFloat(e.target.value) || 0.01})}
-                  disabled={status === 'training'}
-                />
-              </div>
-            </div>
+
+              {!isSklearn && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="input-group">
+                    <label className="input-label">Epochs</label>
+                    <input 
+                      type="number" 
+                      className="input-field" 
+                      value={config.epochs}
+                      min={1} max={200}
+                      onChange={e => setConfig({...config, epochs: parseInt(e.target.value) || 20})}
+                      disabled={status === 'training'}
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label className="input-label">Learning Rate</label>
+                    <input 
+                      type="number" 
+                      step="0.001"
+                      className="input-field" 
+                      value={config.learning_rate}
+                      onChange={e => setConfig({...config, learning_rate: parseFloat(e.target.value) || 0.01})}
+                      disabled={status === 'training'}
+                    />
+                  </div>
+                </div>
+              )}
 
             {/* Tabular Preprocessing block */}
             {isTabular && (
@@ -311,8 +368,8 @@ export default function Training() {
             accuracy={metrics.acc}
             eta={
               status === 'idle' ? 'Ready to start' :
-              status === 'training' ? '5m 30s' : 
-              status === 'computing_valuations' ? 'Computing TracIn & Embeddings...' :
+              status === 'training' ? 'Training Model...' : 
+              status === 'computing_valuations' ? (isSklearn ? 'Computing Fast Leave-One-Out (Sklearn)...' : 'Computing TracIn & Embeddings (PyTorch)...') :
               status === 'storing_results' ? 'Saving results to DB...' : 'Done'
             }
           />

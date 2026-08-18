@@ -146,19 +146,25 @@ class DataValuatorTrainer:
                 losses_np = loss_per_sample.detach().cpu().numpy()
                 epoch_losses[indices_np] = losses_np
 
-                # Compute logit margins for AUM storage
-                with torch.no_grad():
-                    preds = logits.argmax(dim=1)
-                    target_logits = logits[torch.arange(batch_size, device=self.device), targets]
-                    mask = torch.ones_like(logits, dtype=torch.bool)
-                    mask[torch.arange(batch_size, device=self.device), targets] = False
-                    other_logits = logits[mask].view(batch_size, -1)
-                    max_other = other_logits.max(dim=1).values
-                    margins = (target_logits - max_other).cpu().numpy()
+                # Compute logit margins for AUM storage (Classification only)
+                if getattr(self, "task_type", "classification") == "classification":
+                    with torch.no_grad():
+                        preds = logits.argmax(dim=1)
+                        target_logits = logits[torch.arange(batch_size, device=self.device), targets]
+                        mask = torch.ones_like(logits, dtype=torch.bool)
+                        mask[torch.arange(batch_size, device=self.device), targets] = False
+                        other_logits = logits[mask].view(batch_size, -1)
+                        max_other = other_logits.max(dim=1).values
+                        margins = (target_logits - max_other).cpu().numpy()
 
-                epoch_margins[indices_np] = margins
-                epoch_correctness[indices_np] = (preds == targets).cpu().numpy()
-                train_correct += (preds == targets).sum().item()
+                    epoch_margins[indices_np] = margins
+                    epoch_correctness[indices_np] = (preds == targets).cpu().numpy()
+                    train_correct += (preds == targets).sum().item()
+                else:
+                    # For regression, margin and correctness don't make sense in the same way
+                    epoch_margins[indices_np] = -losses_np  # use negative loss as margin
+                    epoch_correctness[indices_np] = False
+                    
                 train_total += batch_size
 
             self.loss_aum_tracker.finalize_epoch()

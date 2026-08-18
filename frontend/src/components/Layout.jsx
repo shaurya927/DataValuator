@@ -30,14 +30,7 @@ export default function Layout({ children }) {
       >
         {/* Logo bar */}
         <div style={styles.sidebarHeader}>
-          {!collapsed && <Link to="/" style={styles.logo}>DataValuator</Link>}
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            style={styles.collapseBtn}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {collapsed ? <ChevronRightIcon size={14} /> : <ChevronLeftIcon size={14} />}
-          </button>
+          <Link to="/" style={styles.logo}>DataValuator</Link>
         </div>
 
         {/* Navigation */}
