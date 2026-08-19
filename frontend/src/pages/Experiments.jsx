@@ -44,33 +44,38 @@ export default function Experiments() {
     }
   };
 
+  const displayExperimentResult = (result) => {
+    setCurrentResult(result);
+    const origAcc = (result.original_accuracy || 0) * 100;
+    const resAcc = (result.result_accuracy || 0) * 100;
+    const cData = Array.from({ length: 20 }).map((_, i) => {
+      const prog = (i + 1) / 20;
+      return {
+        epoch: i + 1,
+        original: origAcc * (0.8 + 0.2 * prog),
+        pruned: resAcc * (0.8 + 0.2 * prog)
+      };
+    });
+    setChartData(cData);
+    setTimeout(() => {
+      document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
   const pollResult = async (expId) => {
     try {
       const result = await api.getExperimentResults(expId);
       if (result.status === 'completed' || result.status === 'failed') {
-        setCurrentResult(result);
         setStatus('idle');
         if (result.status === 'completed') {
           addToast('Experiment completed!', 'success');
+          displayExperimentResult(result);
         } else {
           addToast('Experiment failed', 'error');
         }
         
         const historyData = await api.getExperimentHistory();
         setHistory(historyData || []);
-        
-        // Generate illustrative chart data based on final accuracies
-        const origAcc = (result.original_accuracy || 0) * 100;
-        const resAcc = (result.result_accuracy || 0) * 100;
-        const cData = Array.from({ length: 20 }).map((_, i) => {
-          const prog = (i + 1) / 20;
-          return {
-            epoch: i + 1,
-            original: origAcc * (0.8 + 0.2 * prog),
-            pruned: resAcc * (0.8 + 0.2 * prog)
-          };
-        });
-        setChartData(cData);
       } else {
         setTimeout(() => pollResult(expId), 2000);
       }
@@ -221,9 +226,9 @@ export default function Experiments() {
 
       {/* Results Section */}
       {currentResult && (
-        <>
+        <div id="results-section">
           <h2 className="text-xl font-semibold mt-8 mb-4">
-            Latest Results: {currentResult.type === 'prune' ? `Pruning (${prunePercent}%)` : `Noise (${noisePercent}%)`}
+            Experiment Results: {currentResult.type === 'prune' ? 'Pruning' : 'Label Noise'}
           </h2>
           
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -244,7 +249,7 @@ export default function Experiments() {
               />
               <MetricCard 
                 title="Training Time" 
-                value={currentResult.type === 'prune' ? `-${prunePercent}%` : "No change"} 
+                value={currentResult.type === 'prune' ? 'Faster' : "No change"} 
                 subtitle={currentResult.type === 'prune' ? "Faster convergence" : "Same dataset size"} 
                 icon={<ClockIcon size={24} />} 
                 color={currentResult.type === 'prune' ? "emerald" : "slate"} 
@@ -270,7 +275,7 @@ export default function Experiments() {
               </div>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* History Section */}
@@ -291,7 +296,11 @@ export default function Experiments() {
               </thead>
               <tbody>
                 {history.map(item => (
-                  <tr key={item.id} className="border-b border-white/5 hover:bg-white/5">
+                  <tr 
+                    key={item.id} 
+                    className={`border-b border-white/5 transition-colors ${item.status === 'completed' ? 'cursor-pointer hover:bg-white/10' : ''} ${currentResult?.id === item.id ? 'bg-white/10' : ''}`}
+                    onClick={() => { if(item.status === 'completed') displayExperimentResult(item); }}
+                  >
                     <td className="px-4 py-3 font-medium capitalize">{item.type}</td>
                     <td className="px-4 py-3 text-muted" title={item.run_id}>{item.run_id?.substring(0, 8)}...</td>
                     <td className="px-4 py-3">

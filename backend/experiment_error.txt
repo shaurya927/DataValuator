@@ -11,12 +11,15 @@ Traceback (most recent call last):
   File "D:\Users\imsha\Documents\Projects\DataValuator\backend\app\services\job_manager.py", line 485, in _run_experiment_blocking
     results = model.train(
               ^^^^^^^^^^^^
-  File "D:\Users\imsha\Documents\Projects\DataValuator\backend\app\engine\models\pytorch_models.py", line 111, in train
-    results = trainer.train()
-              ^^^^^^^^^^^^^^^
-  File "D:\Users\imsha\Documents\Projects\DataValuator\backend\app\engine\trainer.py", line 139, in train
-    self.loss_aum_tracker.record_batch(indices, logits, targets)
-  File "D:\Users\imsha\Documents\Projects\DataValuator\backend\app\engine\trackers.py", line 49, in record_batch
-    self.current_epoch_losses[indices_np] = loss
-    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
-IndexError: index 2559 is out of bounds for axis 0 with size 2332
+  File "D:\Users\imsha\Documents\Projects\DataValuator\backend\app\engine\models\pytorch_models.py", line 82, in train
+    train_loader, val_loader = create_pytorch_dataloaders(X_train, y_train, X_val, y_val, self.task_type)
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Users\imsha\Documents\Projects\DataValuator\backend\app\engine\data_loader.py", line 121, in create_pytorch_dataloaders
+    train_loader = DataLoader(indexed_train, batch_size=batch_size, shuffle=True)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\imsha\AppData\Local\Programs\Python\Python312\Lib\site-packages\torch\utils\data\dataloader.py", line 401, in __init__
+    sampler = RandomSampler(dataset, generator=generator)  # type: ignore[arg-type]
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\imsha\AppData\Local\Programs\Python\Python312\Lib\site-packages\torch\utils\data\sampler.py", line 149, in __init__
+    raise ValueError(
+ValueError: num_samples should be a positive integer value, but got num_samples=0

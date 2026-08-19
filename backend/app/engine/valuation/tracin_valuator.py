@@ -67,6 +67,7 @@ class TracInValuator(BaseValuator):
                 learning_rates=lrs,
                 train_loader=train_loader,
                 val_loader=val_loader,
+                task_type=getattr(model_adapter, 'task_type', kwargs.get('task_type', 'classification')),
                 device=device,
             )
         else:

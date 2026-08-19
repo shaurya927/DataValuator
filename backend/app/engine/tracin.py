@@ -20,6 +20,7 @@ def compute_tracin_scores(
     learning_rates: List[float],
     train_loader: Any,
     val_loader: Any,
+    task_type: str = "classification",
     device: str = "cpu",
 ) -> np.ndarray:
     """Computes TracIn self-influence scores for all training samples.
@@ -71,7 +72,6 @@ def compute_tracin_scores(
 
             # Forward pass
             logits = model(data)
-            losses = F.cross_entropy(logits, targets, reduction="none")
 
             # Compute per-sample gradient norms using the diagonal trick:
             # For the last layer: grad_W = (dL/dz) outer (h)
@@ -94,11 +94,17 @@ def compute_tracin_scores(
             h = activations[0]  # (batch, hidden_dim)
 
             # Compute per-sample loss gradients w.r.t. logits
-            # For cross-entropy: dL/dz = softmax(z) - one_hot(y)
-            probs = F.softmax(logits.detach(), dim=1)
-            one_hot = torch.zeros_like(probs)
-            one_hot.scatter_(1, targets.unsqueeze(1), 1.0)
-            dl_dz = probs - one_hot  # (batch, num_classes)
+            if task_type == "classification":
+                # For cross-entropy: dL/dz = softmax(z) - one_hot(y)
+                probs = F.softmax(logits.detach(), dim=1)
+                one_hot = torch.zeros_like(probs)
+                one_hot.scatter_(1, targets.unsqueeze(1), 1.0)
+                dl_dz = probs - one_hot  # (batch, num_classes)
+            else:
+                # For MSE: dL/dz = 2 * (z - y) / (num_classes|1) but we can ignore constants for relative score
+                # Let's just use (logits - targets)
+                targets_resized = targets.view_as(logits)
+                dl_dz = logits.detach() - targets_resized # (batch, output_dim)
 
             # Per-sample gradient norm squared for weight matrix
             # grad_W_i = dl_dz_i (outer) h_i

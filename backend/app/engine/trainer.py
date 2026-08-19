@@ -135,16 +135,8 @@ class DataValuatorTrainer:
                 batch_size = len(targets)
                 train_loss_sum += loss.item() * batch_size
 
-                # Record loss & AUM
-                self.loss_aum_tracker.record_batch(indices, logits, targets)
-
-                # Track forgetting events on training data
-                self.forgetting_tracker.update(indices, logits, targets)
-
-                # Store per-sample epoch metrics for HDF5
                 indices_np = indices.detach().cpu().numpy()
                 losses_np = loss_per_sample.detach().cpu().numpy()
-                epoch_losses[indices_np] = losses_np
 
                 # Compute logit margins for AUM storage (Classification only)
                 if getattr(self, "task_type", "classification") == "classification":
@@ -161,10 +153,19 @@ class DataValuatorTrainer:
                     epoch_correctness[indices_np] = (preds == targets).cpu().numpy()
                     train_correct += (preds == targets).sum().item()
                 else:
-                    # For regression, margin and correctness don't make sense in the same way
-                    epoch_margins[indices_np] = -losses_np  # use negative loss as margin
+                    margins = -losses_np  # use negative loss as margin
+                    epoch_margins[indices_np] = margins
                     epoch_correctness[indices_np] = False
                     
+                # Track forgetting events on training data
+                self.forgetting_tracker.update(indices, logits, targets)
+                
+                # Record loss & AUM (must be after margins are computed)
+                self.loss_aum_tracker.record_batch(indices, loss_per_sample, margins)
+                
+                # Store per-sample epoch metrics for HDF5
+                epoch_losses[indices_np] = losses_np
+                
                 train_total += batch_size
 
             self.loss_aum_tracker.finalize_epoch()

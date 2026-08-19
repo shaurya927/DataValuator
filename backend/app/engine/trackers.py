@@ -41,21 +41,14 @@ class LossAUMTracker:
         self.epoch_counts = np.zeros(num_samples, dtype=np.int32)
         self.current_epoch_losses = np.zeros(num_samples, dtype=np.float32)
         
-    def record_batch(self, sample_indices: torch.Tensor, logits: torch.Tensor, targets: torch.Tensor):
+    def record_batch(self, sample_indices: torch.Tensor, loss_per_sample: torch.Tensor, margin_per_sample: np.ndarray):
         indices_np = sample_indices.detach().cpu().numpy()
-        targets_np = targets.detach().cpu().numpy()
         
-        loss = F.cross_entropy(logits, targets, reduction='none').detach().cpu().numpy()
+        loss = loss_per_sample.detach().cpu().numpy()
         self.current_epoch_losses[indices_np] = loss
         self.sum_loss[indices_np] += loss
         
-        probs = F.softmax(logits, dim=1).detach().cpu().numpy()
-        target_probs = probs[np.arange(len(targets_np)), targets_np]
-        probs[np.arange(len(targets_np)), targets_np] = -1
-        max_other_probs = probs.max(axis=1)
-        
-        margin = target_probs - max_other_probs
-        self.sum_aum[indices_np] += margin
+        self.sum_aum[indices_np] += margin_per_sample
         self.epoch_counts[indices_np] += 1
 
     def finalize_epoch(self):
