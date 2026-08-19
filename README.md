@@ -1,54 +1,53 @@
 # DataValuator
 
-An end-to-end ML platform that determines which training samples actually matter to a machine-learning model.
+An end-to-end Machine Learning platform designed to determine which training samples actually matter to a model's performance. By tracking and analyzing data during and after training, DataValuator helps you identify low-quality data, mislabeled samples, and high-value points.
 
-## Quick Start
+## Key Features
+
+- **Multi-Modal Support**: Train on both Image datasets (via PyTorch CNNs/ResNets) and Tabular datasets (via Scikit-Learn Logistic Regression, Trees, Forests, or Tabular Neural Nets).
+- **Tabular Preprocessing UI**: Visually configure pipelines to handle missing values, categorical encoding, scaling, outliers, and feature selection before training.
+- **Real-Time Dashboards**: Monitor model training metrics, sample-level metrics (e.g. Forgetting Events, AUM), and system metrics via WebSockets.
+- **Valuation Techniques**: Includes implementations of TracIn, Area Under the Margin (AUM), Forgetting Events, Leave-One-Out, and k-NN Rarity Analysis.
+- **Experiments Engine**: Prune datasets based on valuation scores or inject label noise to validate how your dataset modifications affect real-world accuracy.
+
+## Quick Start (Windows)
+
+We provide convenient batch scripts for Windows to manage the environment:
+
+1. **Start the App**: Double-click `start.bat`
+   - This will automatically check prerequisites, create virtual environments, install Python & Node.js dependencies, launch the backend and frontend in minimized windows, and open the dashboard in your default browser.
+2. **Stop the App**: Double-click `stop.bat`
+   - This cleanly shuts down the frontend and backend servers.
+
+## Manual Start
+
+If you prefer to start the servers manually or are not on Windows:
 
 ### Backend
-
 ```bash
 cd backend
+python -m venv venv
+source venv/Scripts/activate  # On macOS/Linux use: source venv/bin/activate
 pip install -r requirements.txt
 python run.py
 ```
-
-The API server starts at `http://localhost:8000`. API docs at `http://localhost:8000/docs`.
+*The API server starts at `http://localhost:8000`. API docs at `http://localhost:8000/docs`.*
 
 ### Frontend
-
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-
-The dashboard opens at `http://localhost:5173`.
-
-### First Run
-
-1. Open the dashboard
-2. Go to **Datasets** → click **Download CIFAR-10**
-3. Go to **Training** → select CIFAR-10, choose a model, click **Start Training**
-4. Watch live training progress via WebSocket
-5. When complete, explore results in **Explorer** and run validation in **Experiments**
+*The dashboard opens at `http://localhost:5173`.*
 
 ## Architecture
 
 ```
-Frontend (React + Vite)  ←→  Backend (FastAPI)  ←→  ML Engine (PyTorch)
+Frontend (React + Vite)  ←→  Backend (FastAPI)  ←→  ML Engine (PyTorch / Sklearn)
          ↕                          ↕                        ↕
-    Plotly/Recharts            SQLite + HDF5         FAISS + UMAP
+    Plotly/Recharts            SQLite + HDF5         FAISS + UMAP + TracIn
 ```
-
-## Valuation Techniques
-
-| Technique | What it measures | Computational cost |
-|-----------|-----------------|-------------------|
-| Forgetting Events | How often a sample is forgotten during training | O(1) per sample/epoch |
-| Loss/AUM Tracking | Per-sample loss trajectory and logit margin | O(N) per epoch |
-| TracIn | Gradient-based influence across checkpoints | O(K·N·p) post-training |
-| Rarity Analysis | Embedding-space density via FAISS k-NN | O(N·log N) post-training |
-| Unified Score | Weighted combination of all signals | O(N) post-training |
 
 ## Project Structure
 
@@ -56,10 +55,10 @@ Frontend (React + Vite)  ←→  Backend (FastAPI)  ←→  ML Engine (PyTorch)
 DataValuator/
 ├── backend/
 │   ├── app/
-│   │   ├── engine/        # PyTorch ML pipeline
+│   │   ├── engine/        # PyTorch & Sklearn ML pipelines, Preprocessing, Valuation
 │   │   ├── models/        # Pydantic schemas
 │   │   ├── routers/       # API endpoints
-│   │   ├── services/      # Job manager, WebSocket
+│   │   ├── services/      # Job manager, WebSockets
 │   │   ├── config.py      # Settings
 │   │   ├── database.py    # SQLite layer
 │   │   └── main.py        # FastAPI app
@@ -69,9 +68,11 @@ DataValuator/
 │   ├── src/
 │   │   ├── api/           # API client + WebSocket hook
 │   │   ├── components/    # Reusable UI components
-│   │   ├── pages/         # Dashboard, Training, Explorer, etc.
+│   │   ├── pages/         # Dashboard, Training, Explorer, Experiments
 │   │   └── index.css      # Design system
 │   ├── package.json
 │   └── vite.config.js
-└── data/                  # Runtime data (gitignored)
+├── data/                  # Runtime data (gitignored)
+├── start.bat              # Auto-start script
+└── stop.bat               # Auto-stop script
 ```

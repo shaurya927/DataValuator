@@ -1,0 +1,14 @@
+@echo off
+echo =========================================
+echo    Stopping DataValuator Environment
+echo =========================================
+echo.
+
+echo Stopping backend and frontend servers...
+:: Kills any command prompt window that starts with "DataValuator" and all of its child processes (node, python, etc.)
+taskkill /FI "WINDOWTITLE eq DataValuator*" /T /F >nul 2>&1
+
+echo.
+echo Servers have been successfully stopped!
+echo.
+pause
