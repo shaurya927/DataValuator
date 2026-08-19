@@ -73,8 +73,12 @@ class PyTorchModelAdapter(BaseModel):
         
     def train(self, train_data: Any, val_data: Optional[Any] = None, config: Optional[Dict] = None, progress_callback=None, cancel_event=None) -> Dict[str, Any]:
         if isinstance(train_data, tuple) and isinstance(train_data[0], np.ndarray):
-            X_train, y_train = train_data
-            X_val, y_val = val_data
+            if len(train_data) == 3:
+                X_train, y_train, train_idx = train_data
+                X_val, y_val, val_idx = val_data
+            else:
+                X_train, y_train = train_data
+                X_val, y_val = val_data
             train_loader, val_loader = create_pytorch_dataloaders(X_train, y_train, X_val, y_val, self.task_type)
             original_num_samples = len(X_train)
         else:

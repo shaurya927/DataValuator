@@ -10,6 +10,7 @@ class TrainingConfig(BaseModel):
     template: Optional[str] = None
     epochs: int
     learning_rate: float
+    preprocessing: dict = {}
 
 class TrainingStatus(BaseModel):
     run_id: str

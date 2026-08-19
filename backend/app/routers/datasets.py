@@ -52,12 +52,22 @@ async def upload_dataset(
         csv_files = [f for f in items if f.lower().endswith('.csv')]
         if len(csv_files) > 0:
             file_path = os.path.join(current_dir, csv_files[0])
-            ds_type = 'csv'
+            # Check if it's Fashion MNIST or pixel data
+            if 'fashion' in file_path.lower() or 'mnist' in file_path.lower() or 'pixel' in file_path.lower():
+                ds_type = 'image_csv'
+            else:
+                ds_type = 'csv'
         else:
             file_path = current_dir
             ds_type = 'image_folder'
     else:
-        ds_type = 'csv' if filename.endswith('.csv') else 'image_folder'
+        if filename.endswith('.csv'):
+            if 'fashion' in filename.lower() or 'mnist' in filename.lower():
+                ds_type = 'image_csv'
+            else:
+                ds_type = 'csv'
+        else:
+            ds_type = 'image_folder'
     
     num_samples = 0
     num_classes = 0
@@ -235,31 +245,15 @@ async def analyze_tabular_dataset(dataset_id: str, settings: Settings = Depends(
         raise HTTPException(status_code=400, detail="Only tabular (CSV) datasets can be analyzed")
         
     ds_path = ds.get("path")
+    target_column = ds.get("target_column")
     try:
         import pandas as pd
-        import numpy as np
+        from app.engine.preprocessing.data_analyzer import analyze_dataframe
         df = pd.read_csv(ds_path)
         
-        columns_info = []
-        for col in df.columns:
-            dtype = str(df[col].dtype)
-            missing = int(df[col].isnull().sum())
-            unique = int(df[col].nunique())
-            col_type = "numerical" if pd.api.types.is_numeric_dtype(df[col]) else "categorical"
-            columns_info.append({
-                "name": col,
-                "type": col_type,
-                "dtype": dtype,
-                "missing": missing,
-                "unique": unique
-            })
-            
-        return {
-            "total_rows": len(df),
-            "total_columns": len(df.columns),
-            "total_missing": int(df.isnull().sum().sum()),
-            "columns": columns_info
-        }
+        analysis = analyze_dataframe(df, target_column)
+        return analysis
+        
     except Exception as e:
         logger.error(f"Analysis failed: {e}")
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
@@ -284,68 +278,20 @@ async def preprocess_tabular_dataset(
     ds_path = ds.get("path")
     try:
         import pandas as pd
-        import numpy as np
-        from sklearn.impute import SimpleImputer
-        from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder
+        from app.engine.preprocessing.pipeline import build_and_run_pipeline
         
         df = pd.read_csv(ds_path)
         
-        # 1. Drop columns
-        if options.drop_columns:
-            cols_to_drop = [c.strip() for c in options.drop_columns if c.strip() in df.columns]
-            df = df.drop(columns=cols_to_drop)
+        config = options.model_dump()
+        target_column = config.get("target_column")
+        if not target_column:
+            target_column = df.columns[-1]
             
-        # 2. Imputation
-        if options.imputation_strategy != "none":
-            if options.imputation_strategy == "drop":
-                df = df.dropna()
-            else:
-                num_cols = df.select_dtypes(include=np.number).columns
-                cat_cols = df.select_dtypes(exclude=np.number).columns
-                
-                if options.imputation_strategy in ["mean", "median", "most_frequent"]:
-                    if len(num_cols) > 0:
-                        strat = options.imputation_strategy if options.imputation_strategy in ["mean", "median"] else "mean"
-                        imp_num = SimpleImputer(strategy=strat)
-                        df[num_cols] = imp_num.fit_transform(df[num_cols])
-                    if len(cat_cols) > 0:
-                        imp_cat = SimpleImputer(strategy="most_frequent")
-                        df[cat_cols] = imp_cat.fit_transform(df[cat_cols])
-                        
-        # 3. Categorical Encoding
-        if options.categorical_encoding != "none":
-            cat_cols = df.select_dtypes(exclude=np.number).columns
-            if options.target_column and options.target_column in cat_cols:
-                # Always label encode target column if specified
-                le = LabelEncoder()
-                df[options.target_column] = le.fit_transform(df[options.target_column].astype(str))
-                cat_cols = [c for c in cat_cols if c != options.target_column]
-                
-            if len(cat_cols) > 0:
-                if options.categorical_encoding == "label":
-                    for c in cat_cols:
-                        le = LabelEncoder()
-                        df[c] = le.fit_transform(df[c].astype(str))
-                elif options.categorical_encoding == "onehot":
-                    df = pd.get_dummies(df, columns=cat_cols, drop_first=True)
-                    
-        # 4. Scaling
-        if options.scaling != "none":
-            num_cols = df.select_dtypes(include=np.number).columns
-            if options.target_column and options.target_column in num_cols:
-                num_cols = [c for c in num_cols if c != options.target_column]
-                
-            if len(num_cols) > 0:
-                if options.scaling == "standard":
-                    scaler = StandardScaler()
-                    df[num_cols] = scaler.fit_transform(df[num_cols])
-                elif options.scaling == "minmax":
-                    scaler = MinMaxScaler()
-                    df[num_cols] = scaler.fit_transform(df[num_cols])
+        df_out = build_and_run_pipeline(df, target_column, config, is_inference=True)
                     
         # Return as CSV
         stream = io.StringIO()
-        df.to_csv(stream, index=False)
+        df_out.to_csv(stream, index=False)
         response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
         response.headers["Content-Disposition"] = f"attachment; filename=preprocessed_{ds.get('name', 'dataset')}"
         return response

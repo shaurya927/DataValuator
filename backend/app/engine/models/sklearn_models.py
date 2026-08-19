@@ -14,7 +14,15 @@ class SklearnModelAdapter(BaseModel):
         self.name = model.__class__.__name__
         
     def train(self, train_data: Any, val_data: Optional[Any] = None, config: Optional[Dict] = None, progress_callback=None, cancel_event=None) -> Dict[str, Any]:
-        X_train, y_train = train_data
+        if isinstance(train_data, tuple):
+            if len(train_data) == 3:
+                X_train, y_train, train_idx = train_data
+                if val_data is not None:
+                    X_val, y_val, val_idx = val_data
+            else:
+                X_train, y_train = train_data
+                if val_data is not None:
+                    X_val, y_val = val_data
         
         if progress_callback:
             progress_callback(0, 0.0, 0.0, f"Training {self.name}...")
@@ -24,7 +32,10 @@ class SklearnModelAdapter(BaseModel):
         train_metric = self.evaluate(X_train, y_train)
         val_metric = 0.0
         if val_data:
-            X_val, y_val = val_data
+            if isinstance(val_data, tuple) and len(val_data) == 3:
+                X_val, y_val, val_idx = val_data
+            else:
+                X_val, y_val = val_data
             val_metric = self.evaluate(X_val, y_val)
             
         if progress_callback:

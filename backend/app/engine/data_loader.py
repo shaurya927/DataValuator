@@ -123,71 +123,87 @@ def create_pytorch_dataloaders(X_train: np.ndarray, y_train: np.ndarray, X_val: 
     
     return train_loader, val_loader
 
-def load_csv_dataset(path: str, target_col: str, task_type: str = "classification") -> Tuple[Tuple[np.ndarray, np.ndarray], Tuple[np.ndarray, np.ndarray], Dict[str, Any]]:
+def load_csv_dataset(path: str, target_col: str, task_type: str = "classification", prep_config: dict = None) -> Tuple[Tuple[np.ndarray, np.ndarray, np.ndarray], Tuple[np.ndarray, np.ndarray, np.ndarray], Dict[str, Any]]:
     """Loads and robustly preprocesses tabular dataset for any model type."""
+    from app.engine.preprocessing import build_and_run_pipeline
+    
     df = pd.read_csv(path)
     
-    # Drop rows where target is NaN
-    if target_col in df.columns:
-        df = df.dropna(subset=[target_col])
-    else:
-        # Fallback if target_col is somehow missing, just pick the last column
-        target_col = df.columns[-1]
-        df = df.dropna(subset=[target_col])
+    if not prep_config:
+        prep_config = {}
         
-    y_raw = df[target_col].values
-    X_df = df.drop(columns=[target_col])
+    prep_config["task_type"] = task_type
     
-    # Identify column types
-    numeric_cols = X_df.select_dtypes(include=[np.number]).columns.tolist()
-    categorical_cols = X_df.select_dtypes(exclude=[np.number]).columns.tolist()
+    res = build_and_run_pipeline(df, target_col, prep_config, is_inference=False)
     
-    # Create preprocessing pipelines
-    numeric_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='mean')),
-        ('scaler', StandardScaler())
-    ])
-    
-    categorical_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='most_frequent')),
-        ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
-    ])
-    
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ('num', numeric_transformer, numeric_cols),
-            ('cat', categorical_transformer, categorical_cols)
-        ]
-    )
-    
-    X = preprocessor.fit_transform(X_df)
-    
-    # Process target
-    if task_type == "classification":
-        le = LabelEncoder()
-        y = le.fit_transform(y_raw)
-        classes = list(le.classes_)
-        num_classes = len(classes)
-    else:
-        y = y_raw.astype(np.float32)
-        classes = []
-        num_classes = 1
-        
-    # Split 80/20 deterministically
-    rng = np.random.RandomState(42)
-    indices = rng.permutation(len(X))
-    split_idx = int(0.8 * len(X))
-    train_idx, val_idx = indices[:split_idx], indices[split_idx:]
-    
-    X_train, X_val = X[train_idx], X[val_idx]
-    y_train, y_val = y[train_idx], y[val_idx]
+    X_train, y_train, train_idx = res["train"]
+    X_val, y_val, val_idx = res["test"]
     
     dataset_info = {
         "num_samples": len(X_train),
-        "num_classes": num_classes,
-        "class_names": classes,
-        "sample_shape": (X.shape[1],),
-        "task_type": task_type
+        "num_classes": res["num_classes"],
+        "class_names": res["classes"],
+        "sample_shape": res["sample_shape"],
+        "task_type": task_type,
+        "features": res["features"]
     }
     
-    return (X_train, y_train), (X_val, y_val), dataset_info
+    return (X_train, y_train, train_idx), (X_val, y_val, val_idx), dataset_info
+    
+def load_image_csv(path: str, batch_size: int = 64) -> Tuple[DataLoader, DataLoader, Dict[str, Any]]:
+    """Loads a CSV containing flattened images (like Fashion MNIST) and reshapes it to 3 channels."""
+    df = pd.read_csv(path)
+    
+    # Assume first column or column named 'label' is the target
+    if 'label' in df.columns:
+        y = df['label'].values
+        X = df.drop('label', axis=1).values
+    else:
+        y = df.iloc[:, 0].values
+        X = df.iloc[:, 1:].values
+        
+    num_samples, num_features = X.shape
+    # Calculate image dimension assuming square image
+    img_size = int(np.sqrt(num_features))
+    if img_size * img_size != num_features:
+        raise ValueError(f"Cannot reshape {num_features} features into a square image.")
+        
+    # Reshape to (N, 1, H, W)
+    X = X.reshape(-1, 1, img_size, img_size).astype(np.float32)
+    # Normalize to 0-1
+    if X.max() > 1.0:
+        X = X / 255.0
+        
+    # Repeat channels to match CNN expectation (3 channels)
+    X = np.repeat(X, 3, axis=1) # (N, 3, H, W)
+    
+    from sklearn.model_selection import train_test_split
+    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+    
+    # We can use TabularDataset directly since it wraps torch.tensor
+    class ImageCSVDataset(Dataset):
+        def __init__(self, data, targets):
+            self.data = torch.tensor(data, dtype=torch.float32)
+            self.targets = torch.tensor(targets, dtype=torch.long)
+        def __len__(self):
+            return len(self.data)
+        def __getitem__(self, idx):
+            return self.data[idx], self.targets[idx]
+            
+    train_set = ImageCSVDataset(X_train, y_train)
+    val_set = ImageCSVDataset(X_val, y_val)
+    
+    indexed_train = IndexedDataset(train_set)
+    indexed_val = IndexedDataset(val_set)
+    
+    train_loader = DataLoader(indexed_train, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(indexed_val, batch_size=batch_size, shuffle=False)
+    
+    dataset_info = {
+        "num_samples": len(X_train),
+        "num_classes": len(np.unique(y_train)),
+        "class_names": [str(c) for c in np.unique(y_train)],
+        "sample_shape": (3, img_size, img_size)
+    }
+    
+    return train_loader, val_loader, dataset_info

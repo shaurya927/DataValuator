@@ -71,7 +71,7 @@ class JobManager:
                 raise ValueError(f"Dataset {config_dict['dataset_id']} not found")
 
             train_loader, val_loader, ds_meta = await asyncio.to_thread(
-                self._load_dataset, dataset_info, config_dict.get("target_column"), config_dict.get("task_type", "classification")
+                self._load_dataset, dataset_info, config_dict.get("target_column"), config_dict.get("task_type", "classification"), config_dict.get("preprocessing", {})
             )
 
             # ---------- 2. Train model ---------- #
@@ -126,11 +126,17 @@ class JobManager:
             await update_training_run(settings.DB_PATH, run_id, {"status": "storing_results"})
             await ws_manager.broadcast({"run_id": run_id, "status": "storing_results", "message": "Saving valuation results..."})
 
+            # If train_loader is a tuple (tabular data), it has train_idx
+            train_indices = None
+            if isinstance(train_loader, tuple) and len(train_loader) == 3:
+                _, _, train_indices = train_loader
+                
             rows = []
             for i in range(len(valuation_data["unified_scores"])):
+                sample_idx = int(train_indices[i]) if train_indices is not None else int(i)
                 rows.append({
                     "run_id": run_id,
-                    "sample_index": int(i),
+                    "sample_index": sample_idx,
                     "forgetting_count": int(valuation_data["forgetting_counts"][i]),
                     "avg_loss": float(valuation_data["avg_loss"][i]),
                     "aum_score": float(valuation_data["aum_scores"][i]),
@@ -213,9 +219,9 @@ class JobManager:
     # ---- blocking helpers (run in thread) ---- #
 
     @staticmethod
-    def _load_dataset(dataset_info: dict, target_column: str = None, task_type: str = "classification"):
+    def _load_dataset(dataset_info: dict, target_column: str = None, task_type: str = "classification", prep_config: dict = None):
         """Load dataset based on type — runs in thread."""
-        from app.engine.data_loader import load_cifar10, load_image_folder, load_csv_dataset
+        from app.engine.data_loader import load_cifar10, load_image_folder, load_csv_dataset, load_image_csv
 
         ds_type = dataset_info["type"]
         ds_path = dataset_info["path"]
@@ -225,8 +231,10 @@ class JobManager:
             return load_cifar10(ds_path)
         elif ds_type == "image_folder":
             return load_image_folder(ds_path)
+        elif ds_type == "image_csv":
+            return load_image_csv(ds_path)
         elif ds_type == "csv":
-            return load_csv_dataset(ds_path, target_col=t_col, task_type=task_type)
+            return load_csv_dataset(ds_path, target_col=t_col, task_type=task_type, prep_config=prep_config)
         else:
             raise ValueError(f"Unknown dataset type: {ds_type}")
 
@@ -363,17 +371,38 @@ class JobManager:
         from app.engine.models import get_model
         
         # load original dataset
-        train_loader_orig, val_loader, ds_meta = JobManager._load_dataset(dataset_info, run_info.get("target_column"))
+        train_loader_orig, val_loader, ds_meta = JobManager._load_dataset(
+            dataset_info, 
+            run_info.get("target_column"), 
+            task_type=run_info.get("task_type", "classification"), 
+            prep_config=config_dict.get("preprocessing", {})
+        )
         
         # filter train_loader
-        pruned_dataset = Subset(train_loader_orig.dataset, kept_indices)
-        num_workers = getattr(train_loader_orig, 'num_workers', 0)
-        train_loader = DataLoader(
-            pruned_dataset, 
-            batch_size=train_loader_orig.batch_size, 
-            shuffle=True, 
-            num_workers=num_workers
-        )
+        # Note: for tabular, train_loader_orig is a tuple (X, y, train_idx).
+        if isinstance(train_loader_orig, tuple) and len(train_loader_orig) == 3:
+            X_train, y_train, train_idx = train_loader_orig
+            # We must map `kept_indices` (which are original DB indices) to the current train subset
+            # Because kept_indices contains the sample_index values we saved to the DB
+            # which are the values inside train_idx.
+            # We need to find the positions in train_idx that match kept_indices
+            mask = np.isin(train_idx, kept_indices)
+            X_train_sub = X_train[mask]
+            y_train_sub = y_train[mask]
+            train_idx_sub = train_idx[mask]
+            train_loader = (X_train_sub, y_train_sub, train_idx_sub)
+            original_len = len(X_train)
+        else:
+            from torch.utils.data import Subset, DataLoader
+            pruned_dataset = Subset(train_loader_orig.dataset, kept_indices)
+            num_workers = getattr(train_loader_orig, 'num_workers', 0)
+            train_loader = DataLoader(
+                pruned_dataset, 
+                batch_size=train_loader_orig.batch_size, 
+                shuffle=True, 
+                num_workers=num_workers
+            )
+            original_len = len(train_loader_orig.dataset)
         
         # model setup
         model_name = run_info.get("template") or run_info.get("model_name", "simple_cnn")
@@ -393,7 +422,7 @@ class JobManager:
         config = {
             "epochs": epochs,
             "lr": lr,
-            "original_num_samples": len(train_loader_orig.dataset),
+            "original_num_samples": original_len,
             "save_dir": None,
             "storage_path": temp_h5_path, 
             "checkpoint_interval": 9999
@@ -418,7 +447,7 @@ class JobManager:
         return {
             "original_accuracy": run_info.get("val_accuracy", 0.0),
             "result_accuracy": results.get("final_val_accuracy", 0.0),
-            "samples_removed": len(train_loader_orig.dataset) - len(kept_indices),
+            "samples_removed": original_len - len(kept_indices),
             "precision": None,
             "recall": None,
         }

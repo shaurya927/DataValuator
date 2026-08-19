@@ -20,9 +20,18 @@ export default function Training() {
     const [tabularAnalysis, setTabularAnalysis] = useState(null);
     const [loadingAnalysis, setLoadingAnalysis] = useState(false);
     const [prepConfig, setPrepConfig] = useState({
-      imputation_strategy: 'none',
-      categorical_encoding: 'none',
-      scaling: 'none',
+      imputation_strategy: 'mean',
+      categorical_encoding: 'onehot',
+      scaling: 'standard',
+      transformation: 'none',
+      outlier_detection: 'none',
+      outlier_treatment: 'none',
+      feature_selection: 'none',
+      imbalance_strategy: 'none',
+      duplicate_handling: 'keep',
+      split_strategy: 'random',
+      test_size: 0.2,
+      random_seed: 42,
       drop_columns: '',
       target_column: ''
     });
@@ -116,7 +125,8 @@ export default function Training() {
       setHistory([]);
       setProgress(0);
       try {
-        const res = await api.startTraining(config);
+        const payload = { ...config, preprocessing: prepConfig };
+        const res = await api.startTraining(payload);
         setRunId(res.run_id || res.runId);
       } catch (e) {
         setStatus('idle');
@@ -273,17 +283,29 @@ export default function Training() {
                       <div className="text-muted text-center py-4">Analyzing dataset...</div>
                     ) : tabularAnalysis ? (
                       <>
-                        <div className="grid grid-cols-2 gap-4 text-xs bg-dark p-3 rounded mb-4">
-                          <div>
-                            <span className="text-muted block uppercase">Rows / Cols</span>
-                            <span className="font-mono">{tabularAnalysis.total_rows.toLocaleString()} / {tabularAnalysis.total_columns}</span>
+                        <div className="text-xs bg-dark p-3 rounded mb-4 space-y-2">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <span className="text-muted block uppercase">Rows / Cols</span>
+                              <span className="font-mono">{tabularAnalysis.total_rows.toLocaleString()} / {tabularAnalysis.total_columns}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted block uppercase">Missing Vals</span>
+                              <span className={`font-mono ${tabularAnalysis.total_missing > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                {tabularAnalysis.total_missing.toLocaleString()}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted block uppercase">Numerical</span>
+                              <span className="font-mono">{tabularAnalysis.num_numerical}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted block uppercase">Categorical</span>
+                              <span className="font-mono">{tabularAnalysis.num_categorical}</span>
+                            </div>
                           </div>
-                          <div>
-                            <span className="text-muted block uppercase">Total Missing</span>
-                            <span className={`font-mono ${tabularAnalysis.total_missing > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                              {tabularAnalysis.total_missing.toLocaleString()}
-                            </span>
-                          </div>
+                          {tabularAnalysis.duplicate_rows > 0 && <div className="text-amber-400 font-medium pt-2 border-t border-glass mt-2">Duplicates found: {tabularAnalysis.duplicate_rows} rows</div>}
+                          {tabularAnalysis.target_info?.imbalance_warning && <div className="text-amber-400 font-medium">Class Imbalance detected!</div>}
                         </div>
 
                         <div className="input-group">
@@ -297,35 +319,101 @@ export default function Training() {
                         <div className="input-group">
                           <label className="input-label text-xs">Missing Values Imputation</label>
                           <select className="input-field py-1 text-xs" value={prepConfig.imputation_strategy} onChange={e => setPrepConfig({...prepConfig, imputation_strategy: e.target.value})}>
-                            <option value="none">None (Leave as is)</option>
+                            <option value="none">None</option>
                             <option value="drop">Drop Rows with Missing</option>
-                            <option value="mean">Mean (Num) + Mode (Cat)</option>
-                            <option value="median">Median (Num) + Mode (Cat)</option>
-                            <option value="most_frequent">Most Frequent (All)</option>
+                            <option value="mean">Mean (Num) / Mode (Cat)</option>
+                            <option value="median">Median (Num) / Mode (Cat)</option>
+                            <option value="most_frequent">Most Frequent</option>
+                            <option value="knn">KNN Imputer (Num) / Mode (Cat)</option>
+                            <option value="constant">Constant (0 / "missing")</option>
+                            <option value="ffill">Forward Fill</option>
+                            <option value="bfill">Backward Fill</option>
                           </select>
                         </div>
 
                         <div className="input-group">
                           <label className="input-label text-xs">Categorical Encoding</label>
                           <select className="input-field py-1 text-xs" value={prepConfig.categorical_encoding} onChange={e => setPrepConfig({...prepConfig, categorical_encoding: e.target.value})}>
-                            <option value="none">None (Leave as is)</option>
+                            <option value="none">None</option>
                             <option value="onehot">One-Hot Encoding</option>
-                            <option value="label">Label Encoding</option>
+                            <option value="ordinal">Ordinal Encoding</option>
+                            <option value="frequency">Frequency Encoding</option>
+                            <option value="target">Target Encoding</option>
                           </select>
                         </div>
                         
                         <div className="input-group">
                           <label className="input-label text-xs">Scaling (Numerical)</label>
                           <select className="input-field py-1 text-xs" value={prepConfig.scaling} onChange={e => setPrepConfig({...prepConfig, scaling: e.target.value})}>
-                            <option value="none">None (Leave as is)</option>
-                            <option value="standard">Standard Scaler</option>
+                            <option value="none">None</option>
+                            <option value="standard">Standard Scaler (Z-score)</option>
                             <option value="minmax">MinMax Scaler</option>
+                            <option value="robust">Robust Scaler</option>
+                          </select>
+                        </div>
+
+                        <div className="input-group">
+                          <label className="input-label text-xs">Feature Transformation</label>
+                          <select className="input-field py-1 text-xs" value={prepConfig.transformation} onChange={e => setPrepConfig({...prepConfig, transformation: e.target.value})}>
+                            <option value="none">None</option>
+                            <option value="log1p">Log1p</option>
+                            <option value="yeo-johnson">Yeo-Johnson</option>
+                          </select>
+                        </div>
+
+                        <div className="input-group">
+                          <label className="input-label text-xs">Outliers</label>
+                          <div className="flex gap-2">
+                            <select className="input-field py-1 text-xs flex-1" value={prepConfig.outlier_detection} onChange={e => setPrepConfig({...prepConfig, outlier_detection: e.target.value})}>
+                              <option value="none">No Detection</option>
+                              <option value="iqr">IQR Based</option>
+                              <option value="zscore">Z-score Based</option>
+                            </select>
+                            <select className="input-field py-1 text-xs flex-1" value={prepConfig.outlier_treatment} onChange={e => setPrepConfig({...prepConfig, outlier_treatment: e.target.value})}>
+                              <option value="none">No Treatment</option>
+                              <option value="clip">Clip / Winsorize</option>
+                              <option value="remove">Remove (Train only)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="input-group">
+                          <label className="input-label text-xs">Feature Selection</label>
+                          <select className="input-field py-1 text-xs" value={prepConfig.feature_selection} onChange={e => setPrepConfig({...prepConfig, feature_selection: e.target.value})}>
+                            <option value="none">None</option>
+                            <option value="constant">Remove Constant Cols</option>
+                            <option value="correlation">Remove Correlated Cols</option>
+                            <option value="selectkbest">Select K Best</option>
+                            <option value="mutual_info">Mutual Information</option>
+                          </select>
+                        </div>
+
+                        {config.task_type === 'classification' && (
+                          <div className="input-group">
+                            <label className="input-label text-xs">Class Imbalance Strategy</label>
+                            <select className="input-field py-1 text-xs" value={prepConfig.imbalance_strategy} onChange={e => setPrepConfig({...prepConfig, imbalance_strategy: e.target.value})}>
+                              <option value="none">None</option>
+                              <option value="random_undersample">Random Undersampling</option>
+                              <option value="random_oversample">Random Oversampling</option>
+                              <option value="smote">SMOTE</option>
+                            </select>
+                          </div>
+                        )}
+
+                        <div className="input-group">
+                          <label className="input-label text-xs">Duplicate Handling</label>
+                          <select className="input-field py-1 text-xs" value={prepConfig.duplicate_handling} onChange={e => setPrepConfig({...prepConfig, duplicate_handling: e.target.value})}>
+                            <option value="keep">Keep Duplicates</option>
+                            <option value="remove">Remove Duplicates</option>
                           </select>
                         </div>
 
                         <div className="input-group">
                           <label className="input-label text-xs">Drop Columns (Comma separated)</label>
                           <input type="text" className="input-field py-1 text-xs" placeholder="e.g. id, Name, Ticket" value={prepConfig.drop_columns} onChange={e => setPrepConfig({...prepConfig, drop_columns: e.target.value})} />
+                          {tabularAnalysis.potential_id_columns?.length > 0 && (
+                            <div className="text-xs text-muted mt-1">Suggested IDs: {tabularAnalysis.potential_id_columns.join(", ")}</div>
+                          )}
                         </div>
 
                         <button 

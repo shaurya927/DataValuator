@@ -27,8 +27,12 @@ class TracInValuator(BaseValuator):
         # but for tabular datasets, it's a tuple of (X, y) numpy arrays.
         if isinstance(train_data, tuple) and isinstance(train_data[0], np.ndarray):
             from app.engine.data_loader import create_pytorch_dataloaders
-            X_train, y_train = train_data
-            X_val, y_val = val_data if val_data else (None, None)
+            if len(train_data) == 3:
+                X_train, y_train, train_idx = train_data
+                X_val, y_val, val_idx = val_data if val_data else (None, None, None)
+            else:
+                X_train, y_train = train_data
+                X_val, y_val = val_data if val_data else (None, None)
             # Use task_type from model_adapter if available
             task_type = getattr(model_adapter, 'task_type', kwargs.get('task_type', 'classification'))
             train_loader, val_loader = create_pytorch_dataloaders(X_train, y_train, X_val, y_val, task_type)

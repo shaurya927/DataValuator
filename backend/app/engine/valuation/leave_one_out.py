@@ -15,14 +15,20 @@ class FastLOOValuator(BaseValuator):
         self.n_iterations = n_iterations
 
     def calculate_influence(self, model_adapter: Any, train_data: Any, val_data: Any = None, **kwargs) -> Dict[str, Any]:
-        X_train, y_train = train_data
+        if len(train_data) == 3:
+            X_train, y_train, train_idx = train_data
+        else:
+            X_train, y_train = train_data
         n_samples = len(X_train)
         
         # We need validation data to compute influence. If none, we evaluate influence on the training set itself.
         if val_data is None:
             X_val, y_val = X_train, y_train
         else:
-            X_val, y_val = val_data
+            if len(val_data) == 3:
+                X_val, y_val, val_idx = val_data
+            else:
+                X_val, y_val = val_data
             
         task_type = model_adapter.task_type
         

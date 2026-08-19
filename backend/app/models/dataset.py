@@ -28,3 +28,6 @@ class PreprocessOptions(BaseModel):
     scaling: str = "none"
     drop_columns: List[str] = []
     target_column: Optional[str] = None
+    
+    class Config:
+        extra = "allow"
