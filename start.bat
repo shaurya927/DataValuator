@@ -14,12 +14,20 @@ echo.
 cd /d "%~dp0"
 
 :: 1. Check Prerequisites
-python --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [ERROR] Python is not installed or not in your PATH.
-    echo Please install Python 3.10+ and try again.
-    pause
-    exit /b
+set PYTHON_CMD=
+py -3 --version >nul 2>&1
+if %errorlevel% equ 0 (
+    set PYTHON_CMD=py -3
+) else (
+    python --version >nul 2>&1
+    if %errorlevel% equ 0 (
+        set PYTHON_CMD=python
+    ) else (
+        echo [ERROR] Python is not installed or not in your PATH.
+        echo Please install Python 3.10+ and try again.
+        pause
+        exit /b
+    )
 )
 
 node --version >nul 2>&1
@@ -33,17 +41,23 @@ if %errorlevel% neq 0 (
 :: 2. Backend Setup & Start
 echo [1/3] Setting up Backend...
 if not exist "backend\venv" (
-    echo Creating Python virtual environment...
-    python -m venv backend\venv
-    call backend\venv\Scripts\activate.bat
-    echo Installing backend dependencies...
-    pip install -r backend\requirements.txt
-) else (
-    call backend\venv\Scripts\activate.bat
+    echo Creating Python virtual environment using %PYTHON_CMD%...
+    %PYTHON_CMD% -m venv backend\venv
 )
 
+:: Handle both standard Windows (Scripts) and MSYS2/Cygwin (bin) Python environments
+if exist "backend\venv\Scripts\activate.bat" (
+    set VENV_ACTIVATE=backend\venv\Scripts\activate.bat
+) else (
+    set VENV_ACTIVATE=backend\venv\bin\activate.bat
+)
+
+call "%VENV_ACTIVATE%"
+echo Installing backend dependencies (this may take a minute)...
+pip install -r backend\requirements.txt
+
 echo Starting backend server in a background window...
-start "DataValuator Backend" /MIN cmd /c "call backend\venv\Scripts\activate.bat && cd backend && python run.py"
+start "DataValuator Backend" /MIN cmd /c "call %VENV_ACTIVATE% && cd backend && python run.py"
 
 :: 3. Frontend Setup & Start
 echo [2/3] Setting up Frontend...
