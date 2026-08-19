@@ -19,4 +19,4 @@ Traceback (most recent call last):
   File "D:\Users\imsha\Documents\Projects\DataValuator\backend\app\engine\trackers.py", line 49, in record_batch
     self.current_epoch_losses[indices_np] = loss
     ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
-IndexError: index 18242 is out of bounds for axis 0 with size 17652
+IndexError: index 2559 is out of bounds for axis 0 with size 2332

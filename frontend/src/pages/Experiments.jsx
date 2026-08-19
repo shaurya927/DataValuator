@@ -31,10 +31,11 @@ export default function Experiments() {
         api.getTrainingHistory(),
         api.getExperimentHistory()
       ]);
-      setRuns(runsData || []);
+      const successfulRuns = (runsData || []).filter(r => r.status === 'completed');
+      setRuns(successfulRuns);
       setHistory(historyData || []);
-      if (runsData && runsData.length > 0) {
-        setSelectedRunId(runsData[0].id);
+      if (successfulRuns.length > 0) {
+        setSelectedRunId(successfulRuns[0].id);
       }
       setStatus('idle');
     } catch (err) {

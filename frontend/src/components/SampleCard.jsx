@@ -56,11 +56,11 @@ export default function SampleCard({ sample, datasetId, onClose }) {
       </div>
 
       {/* Image / Data Preview Placeholder */}
-      <div className="w-full bg-surface rounded-lg mb-6 flex items-center justify-center border border-glass overflow-hidden relative" style={{ aspectRatio: '1 / 1' }}>
+      <div className="w-full shrink-0 bg-surface rounded-lg mb-6 flex items-center justify-center border border-glass overflow-hidden relative" style={{ aspectRatio: '1 / 1' }}>
         {previewType === 'loading' && <div className="text-muted animate-pulse">Loading preview...</div>}
         {previewType === 'error' && <div className="text-4xl text-muted opacity-50"><ImageIcon size={40} /></div>}
         {previewType === 'image' && imageUrl && (
-          <img src={imageUrl} alt={`Sample ${sample.sample_index}`} className="w-full h-full object-cover" />
+          <img src={imageUrl} alt={`Sample ${sample.sample_index}`} className="w-full h-full object-contain" />
         )}
         {previewType === 'tabular' && previewData && (
           <div className="w-full h-full overflow-y-auto p-4 text-xs font-mono bg-black/20 custom-scrollbar pb-10 text-left">

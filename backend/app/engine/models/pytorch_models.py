@@ -87,7 +87,7 @@ class PyTorchModelAdapter(BaseModel):
             original_num_samples = len(train_loader.dataset)
             
         config = config or {}
-        config["original_num_samples"] = original_num_samples
+        config.setdefault("original_num_samples", original_num_samples)
         
         # We need to adapt the trainer's criterion based on task_type if it's regression, 
         # but current trainer hardcodes nn.CrossEntropyLoss(reduction="none"). 
