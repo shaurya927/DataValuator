@@ -16,6 +16,7 @@ export default function FileUpload({ onUploadSuccess }) {
   const [taskType, setTaskType] = useState('image_classification');
   const [targetColumn, setTargetColumn] = useState('target');
   const [template, setTemplate] = useState('resnet18');
+  const [numClasses, setNumClasses] = useState('');
 
   useEffect(() => {
     if (file) {
@@ -72,6 +73,9 @@ export default function FileUpload({ onUploadSuccess }) {
       formData.append('task_type', taskType);
       formData.append('target_column', targetColumn);
       formData.append('template', template);
+      if (numClasses) {
+        formData.append('num_classes', parseInt(numClasses, 10));
+      }
 
       const res = await api.uploadDataset(formData);
       clearInterval(interval);
@@ -177,6 +181,21 @@ export default function FileUpload({ onUploadSuccess }) {
                   placeholder="e.g., target, label, class"
                   className="w-full bg-surface border border-glass rounded-md p-2"
                 />
+              </div>
+            )}
+            
+            {taskType === 'image_classification' && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Number of Classes</label>
+                <input 
+                  type="number" 
+                  min="2"
+                  value={numClasses} 
+                  onChange={e => setNumClasses(e.target.value)}
+                  placeholder="e.g., 6 for Intel Image, 2 for Cats vs Dogs"
+                  className="w-full bg-surface border border-glass rounded-md p-2"
+                />
+                <p className="text-xs text-muted mt-1">Specify this to prevent any folder structure misunderstandings.</p>
               </div>
             )}
 

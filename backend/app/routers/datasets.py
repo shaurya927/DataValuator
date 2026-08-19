@@ -26,6 +26,7 @@ async def upload_dataset(
     task_type: Optional[str] = Form(None),
     target_column: Optional[str] = Form(None),
     template: Optional[str] = Form(None),
+    num_classes: Optional[int] = Form(None),
     settings: Settings = Depends(get_settings)
 ):
     import zipfile
@@ -33,6 +34,9 @@ async def upload_dataset(
     file_path = settings.UPLOAD_DIR / file.filename
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
+        
+    with open("upload_debug.txt", "w") as f:
+        f.write(f"num_classes received: {num_classes}\n")
     
     filename = file.filename.lower()
     
@@ -70,7 +74,6 @@ async def upload_dataset(
             ds_type = 'image_folder'
     
     num_samples = 0
-    num_classes = 0
     
     try:
         if ds_type == 'image_folder':
@@ -83,16 +86,18 @@ async def upload_dataset(
             else:
                 dataset = datasets.ImageFolder(file_path)
             num_samples = len(dataset.samples)
-            num_classes = len(dataset.classes)
+            num_classes_calc_img = len(dataset.classes)
         elif ds_type == 'csv':
             import pandas as pd
             df = pd.read_csv(file_path)
             num_samples = len(df)
             if target_column and target_column in df.columns:
-                num_classes = df[target_column].nunique()
+                num_classes_calc = df[target_column].nunique()
     except Exception as e:
         logger.warning(f"Failed to compute dataset stats: {e}")
         
+    final_num_classes = num_classes if num_classes is not None and num_classes > 0 else (num_classes_calc if 'num_classes_calc' in locals() else num_classes_calc_img if 'num_classes_calc_img' in locals() else 0)
+    
     data = {
         'id': dataset_id,
         'name': file.filename,
@@ -101,7 +106,7 @@ async def upload_dataset(
         'target_column': target_column,
         'default_template': template,
         'num_samples': num_samples,
-        'num_classes': num_classes,
+        'num_classes': final_num_classes,
         'created_at': datetime.now().isoformat(),
         'path': str(file_path)
     }

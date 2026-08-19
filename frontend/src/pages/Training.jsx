@@ -280,7 +280,12 @@ export default function Training() {
                 {showPrepOptions && (
                   <div className="p-4 space-y-4 text-sm animate-fade-in border-t border-glass">
                     {loadingAnalysis ? (
-                      <div className="text-muted text-center py-4">Analyzing dataset...</div>
+                      <div className="flex flex-col items-center justify-center py-8 gap-4">
+                        <div className="text-muted">Analyzing dataset structure...</div>
+                        <div className="progress-track w-32">
+                          <div className="progress-fill active w-full"></div>
+                        </div>
+                      </div>
                     ) : tabularAnalysis ? (
                       <>
                         <div className="text-xs bg-dark p-3 rounded mb-4 space-y-2">
@@ -417,11 +422,18 @@ export default function Training() {
                         </div>
 
                         <button 
-                          className="btn btn-secondary w-full py-1.5 text-xs flex items-center justify-center gap-2 mt-4"
+                          className="btn btn-secondary w-full py-1.5 text-xs flex flex-col items-center justify-center gap-2 mt-4 relative overflow-hidden"
                           onClick={handleDownloadPreprocessed}
                           disabled={isDownloading}
                         >
-                          <DownloadIcon size={14} /> {isDownloading ? 'Processing...' : 'Download Preprocessed'}
+                          <div className="flex items-center gap-2">
+                            <DownloadIcon size={14} /> {isDownloading ? 'Processing...' : 'Download Preprocessed'}
+                          </div>
+                          {isDownloading && (
+                            <div className="absolute bottom-0 left-0 w-full h-1 bg-surface">
+                              <div className="progress-fill active w-full"></div>
+                            </div>
+                          )}
                         </button>
                       </>
                     ) : (

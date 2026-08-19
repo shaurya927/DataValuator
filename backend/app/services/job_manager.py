@@ -95,9 +95,12 @@ class JobManager:
                     loop,
                 )
 
+            # Use user-provided num_classes if available, otherwise fallback to calculated
+            num_classes_to_use = dataset_info.get("num_classes") or ds_meta["num_classes"]
+
             trainer_results = await asyncio.to_thread(
                 self._train_model,
-                model_name, ds_meta["num_classes"], train_loader, val_loader,
+                model_name, num_classes_to_use, train_loader, val_loader,
                 epochs, lr, checkpoint_dir, metrics_path,
                 config_dict.get("checkpoint_interval", settings.CHECKPOINT_INTERVAL),
                 progress_callback,
@@ -118,7 +121,7 @@ class JobManager:
 
             valuation_data = await asyncio.to_thread(
                 self._compute_valuations,
-                model_name, ds_meta["num_classes"], checkpoint_dir,
+                model_name, num_classes_to_use, checkpoint_dir,
                 train_loader, val_loader, trainer_results, lr,
             )
 
@@ -355,6 +358,9 @@ class JobManager:
             })
 
         except Exception as e:
+            err_msg = traceback.format_exc()
+            with open("experiment_error.txt", "w") as f:
+                f.write(err_msg)
             traceback.print_exc()
             await update_experiment(settings.DB_PATH, exp_id, {
                 "status": "failed",
@@ -380,29 +386,72 @@ class JobManager:
         
         # filter train_loader
         # Note: for tabular, train_loader_orig is a tuple (X, y, train_idx).
-        if isinstance(train_loader_orig, tuple) and len(train_loader_orig) == 3:
-            X_train, y_train, train_idx = train_loader_orig
-            # We must map `kept_indices` (which are original DB indices) to the current train subset
-            # Because kept_indices contains the sample_index values we saved to the DB
-            # which are the values inside train_idx.
-            # We need to find the positions in train_idx that match kept_indices
-            mask = np.isin(train_idx, kept_indices)
-            X_train_sub = X_train[mask]
-            y_train_sub = y_train[mask]
-            train_idx_sub = train_idx[mask]
-            train_loader = (X_train_sub, y_train_sub, train_idx_sub)
-            original_len = len(X_train)
+        if config_dict.get("type") == "label_corruption":
+            # For label corruption, we keep all indices but corrupt a percentage
+            kept_indices = list(range(len(train_loader_orig.dataset))) if hasattr(train_loader_orig, 'dataset') else list(range(len(train_loader_orig[0])))
+            corruption_pct = config_dict.get("corruption_pct", 0.1)
+            original_len = len(kept_indices)
+            
+            if isinstance(train_loader_orig, tuple) and len(train_loader_orig) == 3:
+                X_train, y_train, train_idx = train_loader_orig
+                num_corrupt = int(len(y_train) * corruption_pct)
+                corrupt_idx = np.random.choice(len(y_train), num_corrupt, replace=False)
+                num_classes = dataset_info.get("num_classes") or ds_meta["num_classes"]
+                
+                # Corrupt labels by shifting them (simple derangement)
+                if num_classes > 1:
+                    y_train_corrupted = y_train.copy()
+                    shifts = np.random.randint(1, num_classes, size=num_corrupt)
+                    y_train_corrupted[corrupt_idx] = (y_train[corrupt_idx] + shifts) % num_classes
+                    train_loader = (X_train, y_train_corrupted, train_idx)
+                else:
+                    train_loader = train_loader_orig
+            else:
+                # For ImageFolder, we need to wrap the dataset to return corrupted labels
+                from torch.utils.data import Dataset, DataLoader
+                class CorruptedDataset(Dataset):
+                    def __init__(self, ds, corrupt_pct, num_classes):
+                        self.ds = ds
+                        self.num_corrupt = int(len(ds) * corrupt_pct)
+                        self.corrupt_idx = set(np.random.choice(len(ds), self.num_corrupt, replace=False))
+                        self.num_classes = num_classes
+                    def __len__(self): return len(self.ds)
+                    def __getitem__(self, idx):
+                        index, data, target = self.ds[idx]
+                        if idx in self.corrupt_idx and self.num_classes > 1:
+                            target = (target + np.random.randint(1, self.num_classes)) % self.num_classes
+                        return index, data, target
+                        
+                num_classes = dataset_info.get("num_classes") or ds_meta["num_classes"]
+                corrupted_dataset = CorruptedDataset(train_loader_orig.dataset, corruption_pct, num_classes)
+                num_workers = getattr(train_loader_orig, 'num_workers', 0)
+                train_loader = DataLoader(
+                    corrupted_dataset, 
+                    batch_size=train_loader_orig.batch_size, 
+                    shuffle=True, 
+                    num_workers=num_workers
+                )
         else:
-            from torch.utils.data import Subset, DataLoader
-            pruned_dataset = Subset(train_loader_orig.dataset, kept_indices)
-            num_workers = getattr(train_loader_orig, 'num_workers', 0)
-            train_loader = DataLoader(
-                pruned_dataset, 
-                batch_size=train_loader_orig.batch_size, 
-                shuffle=True, 
-                num_workers=num_workers
-            )
-            original_len = len(train_loader_orig.dataset)
+            # PRUNING LOGIC
+            if isinstance(train_loader_orig, tuple) and len(train_loader_orig) == 3:
+                X_train, y_train, train_idx = train_loader_orig
+                mask = np.isin(train_idx, kept_indices)
+                X_train_sub = X_train[mask]
+                y_train_sub = y_train[mask]
+                train_idx_sub = train_idx[mask]
+                train_loader = (X_train_sub, y_train_sub, train_idx_sub)
+                original_len = len(X_train)
+            else:
+                from torch.utils.data import Subset, DataLoader
+                pruned_dataset = Subset(train_loader_orig.dataset, kept_indices)
+                num_workers = getattr(train_loader_orig, 'num_workers', 0)
+                train_loader = DataLoader(
+                    pruned_dataset, 
+                    batch_size=train_loader_orig.batch_size, 
+                    shuffle=True, 
+                    num_workers=num_workers
+                )
+                original_len = len(train_loader_orig.dataset)
         
         # model setup
         model_name = run_info.get("template") or run_info.get("model_name", "simple_cnn")
@@ -413,7 +462,11 @@ class JobManager:
         if model_name == 'tabular' and ds_meta.get('sample_shape'):
             kwargs['input_dim'] = ds_meta['sample_shape'][0]
             
-        model = get_model(model_name, ds_meta["num_classes"], **kwargs)
+        num_classes_to_use = dataset_info.get("num_classes") or ds_meta["num_classes"]
+        kwargs['num_classes'] = num_classes_to_use
+        task_type = run_info.get("task_type", "classification")
+        
+        model = get_model(model_name, task_type, **kwargs)
         
         # Create a temporary file for HDF5 storage that won't crash on Windows
         fd, temp_h5_path = tempfile.mkstemp(suffix=".h5")
@@ -424,18 +477,16 @@ class JobManager:
             "lr": lr,
             "original_num_samples": original_len,
             "save_dir": None,
-            "storage_path": temp_h5_path, 
+            "storage_path": temp_h5_path,
             "checkpoint_interval": 9999
         }
         
         try:
-            trainer = DataValuatorTrainer(
-                 model=model,
-                 train_loader=train_loader,
-                 val_loader=val_loader,
+            results = model.train(
+                 train_data=train_loader,
+                 val_data=val_loader,
                  config=config
             )
-            results = trainer.train()
         finally:
             # Clean up the temporary HDF5 file
             if os.path.exists(temp_h5_path):
