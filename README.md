@@ -1,9 +1,9 @@
 <div align="center">
-  <h1>DataValuator 🔎</h1>
+  <h1>DataValuator</h1>
   <p><strong>An End-to-End Machine Learning Platform for Data Valuation and Quality Analysis</strong></p>
 </div>
 
-## 💡 Overview
+## Overview
 
 **Not all data is created equal.** In modern Machine Learning, the quality of your dataset often matters more than the complexity of your model. 
 
@@ -11,17 +11,17 @@
 
 ---
 
-## ✨ Key Features
+## Key Features
 
-- **🧠 Multi-Modal AI Engine**: Train on both Image datasets (PyTorch CNNs/ResNets) and Tabular datasets (Scikit-Learn Logistic Regression, Decision Trees, Random Forests, or custom Tabular Neural Nets).
-- **⚙️ Interactive Tabular Preprocessing UI**: Visually configure end-to-end pipelines to handle missing values, categorical encoding, scaling, outlier removal, and feature selection before kicking off training.
-- **📊 Real-Time Dashboards**: Monitor model training metrics (loss, accuracy), sample-level metrics (Forgetting Events, AUM), and system metrics via low-latency WebSockets.
-- **🔬 Advanced Valuation Techniques**: State-of-the-art algorithms are built-in, including TracIn, Area Under the Margin (AUM), Forgetting Events, Leave-One-Out, and k-NN Rarity Analysis.
-- **🧪 Experiments Engine**: Prove the value of your data. Prune datasets based on valuation scores or inject label noise to experimentally validate how data modifications affect real-world accuracy.
+- **Multi-Modal AI Engine**: Train on both Image datasets (PyTorch CNNs/ResNets) and Tabular datasets (Scikit-Learn Logistic Regression, Decision Trees, Random Forests, or custom Tabular Neural Nets).
+- **Interactive Tabular Preprocessing UI**: Visually configure end-to-end pipelines to handle missing values, categorical encoding, scaling, outlier removal, and feature selection before kicking off training.
+- **Real-Time Dashboards**: Monitor model training metrics (loss, accuracy), sample-level metrics (Forgetting Events, AUM), and system metrics via low-latency WebSockets.
+- **Advanced Valuation Techniques**: State-of-the-art algorithms are built-in, including TracIn, Area Under the Margin (AUM), Forgetting Events, Leave-One-Out, and k-NN Rarity Analysis.
+- **Experiments Engine**: Prove the value of your data. Prune datasets based on valuation scores or inject label noise to experimentally validate how data modifications affect real-world accuracy.
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Component | Technology |
 |-----------|------------|
@@ -31,9 +31,9 @@
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
-### 🪟 Windows (Auto-Setup)
+### Windows (Auto-Setup)
 We provide convenient batch scripts for Windows to automatically manage the environment:
 
 1. **Start the App**: Double-click `start.bat`
@@ -41,7 +41,7 @@ We provide convenient batch scripts for Windows to automatically manage the envi
 2. **Stop the App**: Double-click `stop.bat`
    - *Cleanly shuts down all related frontend and backend servers.* 
 
-### 💻 Manual Setup (macOS / Linux / Custom)
+### Manual Setup (macOS / Linux / Custom)
 
 **1. Backend**
 ```bash
@@ -63,7 +63,7 @@ npm run dev
 
 ---
 
-## 📖 How to Use DataValuator
+## How to Use DataValuator
 
 1. **Upload or Download Data**: Navigate to **Datasets** and either upload your custom CSV/ZIP files or download our built-in datasets (e.g., CIFAR-10).
 2. **Configure Pipeline**: Go to **Training**, select your dataset, choose a model architecture, and configure your preprocessing steps (imputation, scaling, etc.).
@@ -73,7 +73,7 @@ npm run dev
 
 ---
 
-## 🧮 Valuation Techniques Deep-Dive
+## Valuation Techniques Deep-Dive
 
 DataValuator implements several cutting-edge algorithms to score data:
 
@@ -87,7 +87,7 @@ DataValuator implements several cutting-edge algorithms to score data:
 
 ---
 
-## 🏗️ Architecture Diagram
+## Architecture Diagram
 
 ```mermaid
 graph TD;
@@ -102,7 +102,7 @@ graph TD;
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! If you'd like to improve the preprocessing UI, add new ML models, or implement novel valuation algorithms, please open an issue or submit a pull request.
 
